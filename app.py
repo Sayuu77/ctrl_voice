@@ -107,9 +107,15 @@ st.markdown("""
     .command-item {
         padding: 0.5rem;
         margin: 0.25rem 0;
-        border-left: 4px solid #7E57C2;
+        border-left: 4px solid;
         background: white;
     }
+    .led-amarillo { border-left-color: #FFEB3B; }
+    .led-rojo { border-left-color: #F44336; }
+    .led-verde { border-left-color: #4CAF50; }
+    .led-todos { border-left-color: #9C27B0; }
+    .luz-principal { border-left-color: #2196F3; }
+    .puerta { border-left-color: #FF9800; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -141,11 +147,14 @@ st.markdown('<div class="subtitle">Controla dispositivos IoT con comandos de voz
 with st.expander("📋 Comandos Disponibles", expanded=True):
     st.markdown("""
     <div class="command-list">
-        <div class="command-item"><strong>💡 Amarillo</strong> - Enciende el bombillo amarillo</div>
-        <div class="command-item"><strong>💡 Enciende la luz</strong> - Enciende la luz principal</div>
-        <div class="command-item"><strong>🔌 Apaga la luz</strong> - Apaga la luz principal</div>
-        <div class="command-item"><strong>🚪 Abre la puerta</strong> - Abre la puerta</div>
-        <div class="command-item"><strong>🚪 Cierra la puerta</strong> - Cierra la puerta</div>
+        <div class="command-item led-amarillo"><strong>💡 Amarillo</strong> - Enciende el LED amarillo (3 segundos)</div>
+        <div class="command-item led-rojo"><strong>🔴 Rojo</strong> - Enciende el LED rojo (3 segundos)</div>
+        <div class="command-item led-verde"><strong>🟢 Verde</strong> - Enciende el LED verde (3 segundos)</div>
+        <div class="command-item led-todos"><strong>🌈 Todos los LEDs</strong> - Enciende todos los LEDs (3 segundos)</div>
+        <div class="command-item luz-principal"><strong>💡 Enciende la luz</strong> - Enciende la luz principal</div>
+        <div class="command-item luz-principal"><strong>🔌 Apaga la luz</strong> - Apaga la luz principal</div>
+        <div class="command-item puerta"><strong>🚪 Abre la puerta</strong> - Abre la puerta</div>
+        <div class="command-item puerta"><strong>🚪 Cierra la puerta</strong> - Cierra la puerta</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -219,19 +228,48 @@ if result:
         st.markdown("### 🎯 Comando Reconocido")
         st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
         
-        # Mapeo de comandos más flexible
+        # Mapeo de comandos más flexible con nuevos LEDs
         command_mapping = {
+            # Comandos para LED Amarillo
             'amarillo': 'amarillo',
             'luz amarilla': 'amarillo',
             'prende el amarillo': 'amarillo',
             'enciende el amarillo': 'amarillo',
             'enciende la luz amarilla': 'amarillo',
+            'led amarillo': 'amarillo',
+            
+            # Comandos para LED Rojo
+            'rojo': 'rojo',
+            'luz roja': 'rojo',
+            'prende el rojo': 'rojo',
+            'enciende el rojo': 'rojo',
+            'enciende la luz roja': 'rojo',
+            'led rojo': 'rojo',
+            
+            # Comandos para LED Verde
+            'verde': 'verde',
+            'luz verde': 'verde',
+            'prende el verde': 'verde',
+            'enciende el verde': 'verde',
+            'enciende la luz verde': 'verde',
+            'led verde': 'verde',
+            
+            # Comandos para todos los LEDs
+            'todos los leds': 'todos los leds',
+            'todos los led': 'todos los leds',
+            'enciende todos los leds': 'todos los leds',
+            'prende todos los leds': 'todos los leds',
+            'todos': 'todos los leds',
+            
+            # Comandos para luz principal
             'enciende las luces': 'enciende luz',
             'prende las luces': 'enciende luz', 
             'enciende la luz': 'enciende luz',
             'prende la luz': 'enciende luz',
             'apaga las luces': 'apaga luz',
             'apaga la luz': 'apaga luz',
+            
+            # Comandos para puerta
             'abre la puerta': 'abre puerta',
             'abre puerta': 'abre puerta',
             'abre': 'abre puerta',
@@ -243,7 +281,21 @@ if result:
         # Buscar comando similar
         normalized_command = command_mapping.get(command, command)
         
-        st.markdown(f'<div class="status-indicator">✅ Comando normalizado: "{normalized_command}"</div>', unsafe_allow_html=True)
+        # Mostrar feedback visual del comando normalizado
+        color_indicators = {
+            'amarillo': '🟡',
+            'rojo': '🔴', 
+            'verde': '🟢',
+            'todos los leds': '🌈',
+            'enciende luz': '💡',
+            'apaga luz': '🔌',
+            'abre puerta': '🚪',
+            'cierra puerta': '🚪'
+        }
+        
+        emoji = color_indicators.get(normalized_command, '⚡')
+        
+        st.markdown(f'<div class="status-indicator">{emoji} Comando normalizado: "{normalized_command}"</div>', unsafe_allow_html=True)
         
         # Enviar comando por MQTT
         try:
