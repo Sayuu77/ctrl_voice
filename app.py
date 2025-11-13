@@ -189,7 +189,7 @@ if result:
             client1.on_publish = on_publish
             client1.connect(broker, port)
             message = json.dumps({"Act1": command})
-            client1.publish("voice_ctrl", message)
+            client1.publish("appcolor", message)
             client1.disconnect()
         except Exception as e:
             st.error(f"Error al enviar comando: {e}")
