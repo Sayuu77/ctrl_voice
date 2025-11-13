@@ -207,5 +207,5 @@ if st.session_state.last_command:
 with st.expander("🔧 Información de Conexión", expanded=False):
     st.write(f"**Broker MQTT:** {broker}")
     st.write(f"**Puerto:** {port}")
-    st.write(f"**Tópico:** voice_ctrl")
+    st.write(f"**Tópico:** appcolor")
     st.write("**Comandos sugeridos:** 'encender luz', 'apagar motor', 'abrir puerta', etc.")
