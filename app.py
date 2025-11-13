@@ -98,6 +98,18 @@ st.markdown("""
         font-size: 1rem;
         margin: 1rem 0;
     }
+    .command-list {
+        background: #F8F9FA;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+    .command-item {
+        padding: 0.5rem;
+        margin: 0.25rem 0;
+        border-left: 4px solid #7E57C2;
+        background: white;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -123,17 +135,30 @@ if 'last_received' not in st.session_state:
 
 # Header principal
 st.markdown('<div class="main-title">🎤 Control por Voz</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Comandos de voz en tiempo real</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Controla dispositivos IoT con comandos de voz</div>', unsafe_allow_html=True)
+
+# Sección de comandos disponibles
+with st.expander("📋 Comandos Disponibles", expanded=True):
+    st.markdown("""
+    <div class="command-list">
+        <div class="command-item"><strong>💡 Amarillo</strong> - Enciende el bombillo amarillo</div>
+        <div class="command-item"><strong>💡 Enciende la luz</strong> - Enciende la luz principal</div>
+        <div class="command-item"><strong>🔌 Apaga la luz</strong> - Apaga la luz principal</div>
+        <div class="command-item"><strong>🚪 Abre la puerta</strong> - Abre la puerta</div>
+        <div class="command-item"><strong>🚪 Cierra la puerta</strong> - Cierra la puerta</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Icono de micrófono centrado
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     st.markdown('<div class="mic-button pulse">🎤</div>', unsafe_allow_html=True)
 
-st.markdown('<div class="info-text">Presiona el botón y da tu comando de voz</div>', unsafe_allow_html=True)
+st.markdown('<div class="info-text">Haz clic en el botón y di tu comando de voz</div>', unsafe_allow_html=True)
 
 # Botón de reconocimiento de voz
-stt_button = Button(label=" Iniciar Reconocimiento ", width=300, height=60)
+stt_button = Button(label=" Iniciar Reconocimiento de Voz ", width=300, height=60, 
+                   button_type="success", css_classes=["pulse"])
 stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
     recognition.continuous = false;
@@ -165,47 +190,104 @@ stt_button.js_on_event("button_click", CustomJS(code="""
 # Procesar eventos
 result = streamlit_bokeh_events(
     stt_button,
-    events="GET_TEXT",
+    events="GET_TEXT,RECORDING_START,RECORDING_END,RECORDING_ERROR",
     key="listen",
     refresh_on_update=False,
     override_height=80,
     debounce_time=0
 )
 
-# Mostrar resultados
+# Mostrar estado de grabación
+if result:
+    if "RECORDING_START" in result:
+        st.info("🎤 Escuchando... Habla ahora")
+    if "RECORDING_END" in result:
+        st.success("✅ Grabación completada")
+    if "RECORDING_ERROR" in result:
+        st.error("❌ Error en el reconocimiento de voz")
+
+# Mostrar resultados del comando
 if result:
     if "GET_TEXT" in result:
         command = result.get("GET_TEXT").strip()
+        
+        # Normalizar el comando
+        command = command.lower().strip(' .!?')
         st.session_state.last_command = command
         
         # Mostrar comando reconocido
-        st.markdown("### Comando Reconocido")
-        st.markdown(f'<div style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</div>', unsafe_allow_html=True)
-        st.markdown('<div class="status-indicator">✅ Comando procesado</div>', unsafe_allow_html=True)
+        st.markdown("### 🎯 Comando Reconocido")
+        st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
+        
+        # Mapeo de comandos más flexible
+        command_mapping = {
+            'amarillo': 'amarillo',
+            'luz amarilla': 'amarillo',
+            'prende el amarillo': 'amarillo',
+            'enciende el amarillo': 'amarillo',
+            'enciende la luz amarilla': 'amarillo',
+            'enciende las luces': 'enciende luz',
+            'prende las luces': 'enciende luz', 
+            'enciende la luz': 'enciende luz',
+            'prende la luz': 'enciende luz',
+            'apaga las luces': 'apaga luz',
+            'apaga la luz': 'apaga luz',
+            'abre la puerta': 'abre puerta',
+            'abre puerta': 'abre puerta',
+            'abre': 'abre puerta',
+            'cierra la puerta': 'cierra puerta',
+            'cierra puerta': 'cierra puerta',
+            'cierra': 'cierra puerta'
+        }
+        
+        # Buscar comando similar
+        normalized_command = command_mapping.get(command, command)
+        
+        st.markdown(f'<div class="status-indicator">✅ Comando normalizado: "{normalized_command}"</div>', unsafe_allow_html=True)
         
         # Enviar comando por MQTT
         try:
-            client1 = paho.Client("GIT-HUBC")
+            client1 = paho.Client("streamlit-voice-control")
             client1.on_publish = on_publish
             client1.connect(broker, port)
-            message = json.dumps({"Act1": command})
-            client1.publish("appcolor", message)
+            message = json.dumps({"Act1": normalized_command})
+            ret = client1.publish("appcolor", message)
+            st.toast(f"📡 Comando enviado: {normalized_command}", icon="✅")
+            time.sleep(1)  # Dar tiempo para que se envíe el mensaje
             client1.disconnect()
         except Exception as e:
-            st.error(f"Error al enviar comando: {e}")
+            st.error(f"❌ Error al enviar comando: {e}")
 
 # Historial de comandos
 if st.session_state.last_command:
-    with st.expander("Historial de Comandos", expanded=True):
+    with st.expander("📊 Historial de Comandos", expanded=True):
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Último Comando", st.session_state.last_command)
         with col2:
-            st.metric("Estado", "Enviado")
+            st.metric("Estado", "Enviado ✓")
 
 # Información de conexión
 with st.expander("🔧 Información de Conexión", expanded=False):
-    st.write(f"**Broker MQTT:** {broker}")
-    st.write(f"**Puerto:** {port}")
-    st.write(f"**Tópico:** appcolor")
-    st.write("**Comandos sugeridos:** 'encender luz', 'apagar motor', 'abrir puerta', etc.")
+    st.write(f"**Broker MQTT:** `{broker}`")
+    st.write(f"**Puerto:** `{port}`")
+    st.write(f"**Tópico:** `appcolor`")
+    st.write(f"**Cliente ID:** `streamlit-voice-control`")
+    
+    # Estado de conexión
+    try:
+        test_client = paho.Client("test-connection")
+        test_client.connect(broker, port, 5)
+        test_client.disconnect()
+        st.success("✅ Conexión MQTT disponible")
+    except:
+        st.error("❌ No se puede conectar al broker MQTT")
+
+# Footer
+st.markdown("---")
+st.markdown(
+    "<div style='text-align: center; color: #666;'>"
+    "Control por Voz IoT | Streamlit + ESP32 + MQTT"
+    "</div>", 
+    unsafe_allow_html=True
+)
