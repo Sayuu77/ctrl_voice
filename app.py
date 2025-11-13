@@ -85,6 +85,16 @@ st.markdown("""
         font-weight: 500;
         margin: 0.5rem 0;
     }
+    .status-indicator-off {
+        display: inline-flex;
+        align-items: center;
+        background: #FFEBEE;
+        color: #C62828;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 500;
+        margin: 0.5rem 0;
+    }
     .pulse {
         animation: pulse 2s infinite;
     }
@@ -147,14 +157,27 @@ st.markdown('<div class="subtitle">Controla dispositivos IoT con comandos de voz
 with st.expander("📋 Comandos Disponibles", expanded=True):
     st.markdown("""
     <div class="command-list">
-        <div class="command-item led-amarillo"><strong>💡 Amarillo</strong> - Enciende el LED amarillo (3 segundos)</div>
-        <div class="command-item led-rojo"><strong>🔴 Rojo</strong> - Enciende el LED rojo (3 segundos)</div>
-        <div class="command-item led-verde"><strong>🟢 Verde</strong> - Enciende el LED verde (3 segundos)</div>
-        <div class="command-item led-todos"><strong>🌈 Todos los LEDs</strong> - Enciende todos los LEDs (3 segundos)</div>
-        <div class="command-item luz-principal"><strong>💡 Enciende la luz</strong> - Enciende la luz principal</div>
-        <div class="command-item luz-principal"><strong>🔌 Apaga la luz</strong> - Apaga la luz principal</div>
+        <div class="command-item led-amarillo"><strong>💡 Enciende el amarillo</strong> - Enciende LED amarillo</div>
+        <div class="command-item led-amarillo"><strong>🔌 Apaga el amarillo</strong> - Apaga LED amarillo</div>
+        
+        <div class="command-item led-rojo"><strong>🔴 Enciende el rojo</strong> - Enciende LED rojo</div>
+        <div class="command-item led-rojo"><strong>🔌 Apaga el rojo</strong> - Apaga LED rojo</div>
+        
+        <div class="command-item led-verde"><strong>🟢 Enciende el verde</strong> - Enciende LED verde</div>
+        <div class="command-item led-verde"><strong>🔌 Apaga el verde</strong> - Apaga LED verde</div>
+        
+        <div class="command-item led-todos"><strong>🌈 Enciende todos los LEDs</strong> - Enciende todos los LEDs</div>
+        <div class="command-item led-todos"><strong>🔌 Apaga todos los LEDs</strong> - Apaga todos los LEDs</div>
+        
+        <div class="command-item luz-principal"><strong>💡 Enciende la luz</strong> - Enciende luz principal</div>
+        <div class="command-item luz-principal"><strong>🔌 Apaga la luz</strong> - Apaga luz principal</div>
+        
         <div class="command-item puerta"><strong>🚪 Abre la puerta</strong> - Abre la puerta</div>
         <div class="command-item puerta"><strong>🚪 Cierra la puerta</strong> - Cierra la puerta</div>
+        
+        <div style="margin-top: 1rem; padding: 0.5rem; background: #E3F2FD; border-radius: 5px;">
+            <small>💡 <strong>Nota:</strong> Los LEDs permanecen encendidos hasta que los apagues con un comando</small>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -228,38 +251,47 @@ if result:
         st.markdown("### 🎯 Comando Reconocido")
         st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
         
-        # Mapeo de comandos más flexible con nuevos LEDs
+        # Mapeo de comandos más flexible con control de encendido/apagado
         command_mapping = {
-            # Comandos para LED Amarillo
-            'amarillo': 'amarillo',
-            'luz amarilla': 'amarillo',
-            'prende el amarillo': 'amarillo',
-            'enciende el amarillo': 'amarillo',
-            'enciende la luz amarilla': 'amarillo',
-            'led amarillo': 'amarillo',
+            # Comandos para ENCENDER LED Amarillo
+            'enciende el amarillo': 'enciende amarillo',
+            'prende el amarillo': 'enciende amarillo',
+            'enciende amarillo': 'enciende amarillo',
+            'enciende la luz amarilla': 'enciende amarillo',
+            'amarillo enciende': 'enciende amarillo',
             
-            # Comandos para LED Rojo
-            'rojo': 'rojo',
-            'luz roja': 'rojo',
-            'prende el rojo': 'rojo',
-            'enciende el rojo': 'rojo',
-            'enciende la luz roja': 'rojo',
-            'led rojo': 'rojo',
+            # Comandos para APAGAR LED Amarillo
+            'apaga el amarillo': 'apaga amarillo',
+            'apaga amarillo': 'apaga amarillo',
             
-            # Comandos para LED Verde
-            'verde': 'verde',
-            'luz verde': 'verde',
-            'prende el verde': 'verde',
-            'enciende el verde': 'verde',
-            'enciende la luz verde': 'verde',
-            'led verde': 'verde',
+            # Comandos para ENCENDER LED Rojo
+            'enciende el rojo': 'enciende rojo',
+            'prende el rojo': 'enciende rojo',
+            'enciende rojo': 'enciende rojo',
+            'enciende la luz roja': 'enciende rojo',
+            'rojo enciende': 'enciende rojo',
             
-            # Comandos para todos los LEDs
-            'todos los leds': 'todos los leds',
-            'todos los led': 'todos los leds',
-            'enciende todos los leds': 'todos los leds',
-            'prende todos los leds': 'todos los leds',
-            'todos': 'todos los leds',
+            # Comandos para APAGAR LED Rojo
+            'apaga el rojo': 'apaga rojo',
+            'apaga rojo': 'apaga rojo',
+            
+            # Comandos para ENCENDER LED Verde
+            'enciende el verde': 'enciende verde',
+            'prende el verde': 'enciende verde',
+            'enciende verde': 'enciende verde',
+            'enciende la luz verde': 'enciende verde',
+            'verde enciende': 'enciende verde',
+            
+            # Comandos para APAGAR LED Verde
+            'apaga el verde': 'apaga verde',
+            'apaga verde': 'apaga verde',
+            
+            # Comandos para TODOS los LEDs
+            'enciende todos los leds': 'enciende todos los leds',
+            'prende todos los leds': 'enciende todos los leds',
+            'enciende todos los led': 'enciende todos los leds',
+            'apaga todos los leds': 'apaga todos los leds',
+            'apaga todos los led': 'apaga todos los leds',
             
             # Comandos para luz principal
             'enciende las luces': 'enciende luz',
@@ -272,30 +304,41 @@ if result:
             # Comandos para puerta
             'abre la puerta': 'abre puerta',
             'abre puerta': 'abre puerta',
-            'abre': 'abre puerta',
             'cierra la puerta': 'cierra puerta',
             'cierra puerta': 'cierra puerta',
-            'cierra': 'cierra puerta'
+            
+            # Comandos simples (sin "enciende/apaga" - por defecto encienden)
+            'amarillo': 'enciende amarillo',
+            'rojo': 'enciende rojo',
+            'verde': 'enciende verde',
         }
         
         # Buscar comando similar
         normalized_command = command_mapping.get(command, command)
         
+        # Determinar si es comando de encendido o apagado
+        es_encendido = normalized_command.startswith('enciende')
+        es_apagado = normalized_command.startswith('apaga')
+        
         # Mostrar feedback visual del comando normalizado
         color_indicators = {
-            'amarillo': '🟡',
-            'rojo': '🔴', 
-            'verde': '🟢',
-            'todos los leds': '🌈',
-            'enciende luz': '💡',
-            'apaga luz': '🔌',
-            'abre puerta': '🚪',
-            'cierra puerta': '🚪'
+            'enciende amarillo': ('🟡 ENCENDIENDO LED AMARILLO', 'status-indicator'),
+            'apaga amarillo': ('🔴 APAGANDO LED AMARILLO', 'status-indicator-off'),
+            'enciende rojo': ('🔴 ENCENDIENDO LED ROJO', 'status-indicator'),
+            'apaga rojo': ('🔴 APAGANDO LED ROJO', 'status-indicator-off'),
+            'enciende verde': ('🟢 ENCENDIENDO LED VERDE', 'status-indicator'),
+            'apaga verde': ('🔴 APAGANDO LED VERDE', 'status-indicator-off'),
+            'enciende todos los leds': ('🌈 ENCENDIENDO TODOS LOS LEDs', 'status-indicator'),
+            'apaga todos los leds': ('🔴 APAGANDO TODOS LOS LEDs', 'status-indicator-off'),
+            'enciende luz': ('💡 ENCENDIENDO LUZ PRINCIPAL', 'status-indicator'),
+            'apaga luz': ('🔌 APAGANDO LUZ PRINCIPAL', 'status-indicator-off'),
+            'abre puerta': ('🚪 ABRIENDO PUERTA', 'status-indicator'),
+            'cierra puerta': ('🚪 CERRANDO PUERTA', 'status-indicator-off')
         }
         
-        emoji = color_indicators.get(normalized_command, '⚡')
+        mensaje, clase_css = color_indicators.get(normalized_command, (f'⚡ {normalized_command}', 'status-indicator'))
         
-        st.markdown(f'<div class="status-indicator">{emoji} Comando normalizado: "{normalized_command}"</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="{clase_css}">{mensaje}</div>', unsafe_allow_html=True)
         
         # Enviar comando por MQTT
         try:
@@ -304,7 +347,15 @@ if result:
             client1.connect(broker, port)
             message = json.dumps({"Act1": normalized_command})
             ret = client1.publish("appcolor", message)
-            st.toast(f"📡 Comando enviado: {normalized_command}", icon="✅")
+            
+            # Toast personalizado según el tipo de comando
+            if es_encendido:
+                st.toast(f"💡 Encendiendo: {normalized_command}", icon="✅")
+            elif es_apagado:
+                st.toast(f"🔌 Apagando: {normalized_command}", icon="🔴")
+            else:
+                st.toast(f"📡 Comando enviado: {normalized_command}", icon="✅")
+                
             time.sleep(1)  # Dar tiempo para que se envíe el mensaje
             client1.disconnect()
         except Exception as e:
