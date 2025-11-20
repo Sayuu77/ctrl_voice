@@ -15,7 +15,7 @@ tornado >=5.1
 xyzservices >=2021.09.1
 bokeh==2.4.3
 Streamlit-bokeh-events
-opencv2-python==4.8.1.78
+opencv-python==4.8.1.78
 numpy==1.24.3
 scipy==1.11.3
 scikit-image==0.21.0
