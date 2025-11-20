@@ -9,9 +9,6 @@ import paho.mqtt.client as paho
 import json
 from gtts import gTTS
 from googletrans import Translator
-import cv2
-import numpy as np
-import tempfile
 
 # Configuración de página
 st.set_page_config(
@@ -142,56 +139,53 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Función para detectar colores en una imagen
+# Función para detectar colores básica con PIL (sin OpenCV)
 def detectar_colores(imagen):
     """
-    Detecta los colores amarillo, verde y rojo en una imagen
+    Detecta los colores amarillo, verde y rojo en una imagen usando PIL
     Retorna un diccionario con los colores detectados
     """
-    # Convertir la imagen de PIL a OpenCV
-    img_array = np.array(imagen)
-    img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    # Convertir la imagen a RGB si no lo está
+    if imagen.mode != 'RGB':
+        imagen = imagen.convert('RGB')
     
-    # Convertir a HSV para mejor detección de colores
-    hsv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2HSV)
+    # Reducir el tamaño de la imagen para mejorar el rendimiento
+    imagen = imagen.resize((100, 100))
     
-    # Definir rangos de colores en HSV
-    # Amarillo
-    amarillo_bajo = np.array([20, 100, 100])
-    amarillo_alto = np.array([30, 255, 255])
+    # Obtener los píxeles de la imagen
+    pixels = imagen.load()
+    width, height = imagen.size
     
-    # Verde
-    verde_bajo = np.array([36, 100, 100])
-    verde_alto = np.array([86, 255, 255])
+    # Contadores para cada color
+    count_amarillo = 0
+    count_verde = 0
+    count_rojo = 0
+    total_pixels = width * height
     
-    # Rojo (dos rangos porque el rojo está en ambos extremos del espectro HSV)
-    rojo_bajo1 = np.array([0, 100, 100])
-    rojo_alto1 = np.array([10, 255, 255])
-    rojo_bajo2 = np.array([160, 100, 100])
-    rojo_alto2 = np.array([180, 255, 255])
+    # Definir rangos de colores en RGB
+    for x in range(width):
+        for y in range(height):
+            r, g, b = pixels[x, y]
+            
+            # Detectar AMARILLO (alto en rojo y verde, bajo en azul)
+            if r > 150 and g > 150 and b < 100 and abs(r - g) < 50:
+                count_amarillo += 1
+            
+            # Detectar VERDE (alto en verde, bajo en rojo y azul)
+            elif g > 100 and r < g * 0.8 and b < g * 0.8:
+                count_verde += 1
+            
+            # Detectar ROJO (alto en rojo, bajo en verde y azul)
+            elif r > 100 and g < r * 0.6 and b < r * 0.6:
+                count_rojo += 1
     
-    # Crear máscaras para cada color
-    mascara_amarillo = cv2.inRange(hsv, amarillo_bajo, amarillo_alto)
-    mascara_verde = cv2.inRange(hsv, verde_bajo, verde_alto)
-    mascara_rojo1 = cv2.inRange(hsv, rojo_bajo1, rojo_alto1)
-    mascara_rojo2 = cv2.inRange(hsv, rojo_bajo2, rojo_alto2)
-    mascara_rojo = cv2.bitwise_or(mascara_rojo1, mascara_rojo2)
+    # Calcular porcentajes
+    porcentaje_amarillo = (count_amarillo / total_pixels) * 100
+    porcentaje_verde = (count_verde / total_pixels) * 100
+    porcentaje_rojo = (count_rojo / total_pixels) * 100
     
-    # Aplicar operaciones morfológicas para reducir ruido
-    kernel = np.ones((5,5), np.uint8)
-    mascara_amarillo = cv2.morphologyEx(mascara_amarillo, cv2.MORPH_OPEN, kernel)
-    mascara_verde = cv2.morphologyEx(mascara_verde, cv2.MORPH_OPEN, kernel)
-    mascara_rojo = cv2.morphologyEx(mascara_rojo, cv2.MORPH_OPEN, kernel)
-    
-    # Calcular el porcentaje de píxeles de cada color
-    total_pixeles = img_cv.shape[0] * img_cv.shape[1]
-    
-    porcentaje_amarillo = np.sum(mascara_amarillo > 0) / total_pixeles * 100
-    porcentaje_verde = np.sum(mascara_verde > 0) / total_pixeles * 100
-    porcentaje_rojo = np.sum(mascara_rojo > 0) / total_pixeles * 100
-    
-    # Umbral para considerar que un color está presente (ajustable)
-    umbral_deteccion = 0.1  # 0.1% de la imagen
+    # Umbral para considerar que un color está presente
+    umbral_deteccion = 0.5  # 0.5% de la imagen
     
     colores_detectados = {
         'amarillo': porcentaje_amarillo > umbral_deteccion,
@@ -306,6 +300,7 @@ if foto is not None:
         # Si no se detectó ningún color
         if not any([colores_detectados['amarillo'], colores_detectados['verde'], colores_detectados['rojo']]):
             st.info("ℹ️ No se detectaron los colores amarillo, verde o rojo en la imagen.")
+            st.write(f"Porcentajes: Amarillo: {colores_detectados['porcentajes']['amarillo']}%, Verde: {colores_detectados['porcentajes']['verde']}%, Rojo: {colores_detectados['porcentajes']['rojo']}%")
         
         # Botón para enviar comandos basados en colores detectados
         st.markdown("### 💡 Acciones Rápidas")
@@ -335,6 +330,9 @@ if foto is not None:
                     st.success("✅ Comandos enviados exitosamente")
                 except Exception as e:
                     st.error(f"❌ Error al enviar comandos: {e}")
+
+# El resto del código original permanece igual...
+# [Aquí va todo el resto de tu código original de control por voz]
 
 # Icono de micrófono centrado
 col1, col2, col3 = st.columns([1, 2, 1])
