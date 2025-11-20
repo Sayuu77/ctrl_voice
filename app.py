@@ -9,6 +9,9 @@ import paho.mqtt.client as paho
 import json
 from gtts import gTTS
 from googletrans import Translator
+import cv2
+import numpy as np
+import tempfile
 
 # Configuración de página
 st.set_page_config(
@@ -126,8 +129,82 @@ st.markdown("""
     .led-todos { border-left-color: #9C27B0; }
     .luz-principal { border-left-color: #2196F3; }
     .puerta { border-left-color: #FF9800; }
+    .color-detected {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: bold;
+        margin: 0.25rem;
+        display: inline-block;
+    }
+    .color-yellow { background: #FFF9C4; color: #F57F17; border: 2px solid #FFEB3B; }
+    .color-red { background: #FFEBEE; color: #C62828; border: 2px solid #F44336; }
+    .color-green { background: #E8F5E8; color: #2E7D32; border: 2px solid #4CAF50; }
 </style>
 """, unsafe_allow_html=True)
+
+# Función para detectar colores en una imagen
+def detectar_colores(imagen):
+    """
+    Detecta los colores amarillo, verde y rojo en una imagen
+    Retorna un diccionario con los colores detectados
+    """
+    # Convertir la imagen de PIL a OpenCV
+    img_array = np.array(imagen)
+    img_cv = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+    
+    # Convertir a HSV para mejor detección de colores
+    hsv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2HSV)
+    
+    # Definir rangos de colores en HSV
+    # Amarillo
+    amarillo_bajo = np.array([20, 100, 100])
+    amarillo_alto = np.array([30, 255, 255])
+    
+    # Verde
+    verde_bajo = np.array([36, 100, 100])
+    verde_alto = np.array([86, 255, 255])
+    
+    # Rojo (dos rangos porque el rojo está en ambos extremos del espectro HSV)
+    rojo_bajo1 = np.array([0, 100, 100])
+    rojo_alto1 = np.array([10, 255, 255])
+    rojo_bajo2 = np.array([160, 100, 100])
+    rojo_alto2 = np.array([180, 255, 255])
+    
+    # Crear máscaras para cada color
+    mascara_amarillo = cv2.inRange(hsv, amarillo_bajo, amarillo_alto)
+    mascara_verde = cv2.inRange(hsv, verde_bajo, verde_alto)
+    mascara_rojo1 = cv2.inRange(hsv, rojo_bajo1, rojo_alto1)
+    mascara_rojo2 = cv2.inRange(hsv, rojo_bajo2, rojo_alto2)
+    mascara_rojo = cv2.bitwise_or(mascara_rojo1, mascara_rojo2)
+    
+    # Aplicar operaciones morfológicas para reducir ruido
+    kernel = np.ones((5,5), np.uint8)
+    mascara_amarillo = cv2.morphologyEx(mascara_amarillo, cv2.MORPH_OPEN, kernel)
+    mascara_verde = cv2.morphologyEx(mascara_verde, cv2.MORPH_OPEN, kernel)
+    mascara_rojo = cv2.morphologyEx(mascara_rojo, cv2.MORPH_OPEN, kernel)
+    
+    # Calcular el porcentaje de píxeles de cada color
+    total_pixeles = img_cv.shape[0] * img_cv.shape[1]
+    
+    porcentaje_amarillo = np.sum(mascara_amarillo > 0) / total_pixeles * 100
+    porcentaje_verde = np.sum(mascara_verde > 0) / total_pixeles * 100
+    porcentaje_rojo = np.sum(mascara_rojo > 0) / total_pixeles * 100
+    
+    # Umbral para considerar que un color está presente (ajustable)
+    umbral_deteccion = 0.1  # 0.1% de la imagen
+    
+    colores_detectados = {
+        'amarillo': porcentaje_amarillo > umbral_deteccion,
+        'verde': porcentaje_verde > umbral_deteccion,
+        'rojo': porcentaje_rojo > umbral_deteccion,
+        'porcentajes': {
+            'amarillo': round(porcentaje_amarillo, 2),
+            'verde': round(porcentaje_verde, 2),
+            'rojo': round(porcentaje_rojo, 2)
+        }
+    }
+    
+    return colores_detectados
 
 # Callbacks MQTT
 def on_publish(client, userdata, result):
@@ -148,6 +225,10 @@ if 'last_command' not in st.session_state:
     st.session_state.last_command = ""
 if 'last_received' not in st.session_state:
     st.session_state.last_received = ""
+if 'foto_tomada' not in st.session_state:
+    st.session_state.foto_tomada = None
+if 'colores_detectados' not in st.session_state:
+    st.session_state.colores_detectados = None
 
 # Header principal
 st.markdown('<div class="main-title">🎤 Control por Voz</div>', unsafe_allow_html=True)
@@ -180,6 +261,80 @@ with st.expander("📋 Comandos Disponibles", expanded=True):
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+# SECCIÓN NUEVA: DETECCIÓN DE COLORES CON CÁMARA
+st.markdown("---")
+st.markdown("### 📷 Detección de Colores con Cámara")
+
+# Tomar foto con la cámara
+foto = st.camera_input("Toma una foto para detectar colores (amarillo, verde, rojo)")
+
+if foto is not None:
+    # Procesar la imagen
+    imagen = Image.open(foto)
+    st.session_state.foto_tomada = imagen
+    
+    # Detectar colores
+    with st.spinner("🔍 Analizando colores en la imagen..."):
+        colores_detectados = detectar_colores(imagen)
+        st.session_state.colores_detectados = colores_detectados
+    
+    # Mostrar resultados
+    st.markdown("### 🎨 Colores Detectados")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.image(imagen, caption="Foto tomada", use_column_width=True)
+    
+    with col2:
+        # Mostrar qué colores se detectaron
+        st.markdown("**Resultados de detección:**")
+        
+        if colores_detectados['amarillo']:
+            st.markdown('<div class="color-detected color-yellow">🟡 AMARILLO Detectado</div>', unsafe_allow_html=True)
+            st.write(f"Porcentaje: {colores_detectados['porcentajes']['amarillo']}%")
+        
+        if colores_detectados['verde']:
+            st.markdown('<div class="color-detected color-green">🟢 VERDE Detectado</div>', unsafe_allow_html=True)
+            st.write(f"Porcentaje: {colores_detectados['porcentajes']['verde']}%")
+        
+        if colores_detectados['rojo']:
+            st.markdown('<div class="color-detected color-red">🔴 ROJO Detectado</div>', unsafe_allow_html=True)
+            st.write(f"Porcentaje: {colores_detectados['porcentajes']['rojo']}%")
+        
+        # Si no se detectó ningún color
+        if not any([colores_detectados['amarillo'], colores_detectados['verde'], colores_detectados['rojo']]):
+            st.info("ℹ️ No se detectaron los colores amarillo, verde o rojo en la imagen.")
+        
+        # Botón para enviar comandos basados en colores detectados
+        st.markdown("### 💡 Acciones Rápidas")
+        colores_para_encender = []
+        
+        if colores_detectados['amarillo']:
+            colores_para_encender.append("amarillo")
+        if colores_detectados['verde']:
+            colores_para_encender.append("verde")
+        if colores_detectados['rojo']:
+            colores_para_encender.append("rojo")
+        
+        if colores_para_encender:
+            if st.button(f"🔄 Encender LEDs detectados ({', '.join(colores_para_encender)})"):
+                try:
+                    client1 = paho.Client("streamlit-color-detection")
+                    client1.on_publish = on_publish
+                    client1.connect(broker, port)
+                    
+                    for color in colores_para_encender:
+                        message = json.dumps({"Act1": f"enciende {color}"})
+                        ret = client1.publish("appcolor", message)
+                        st.toast(f"💡 Encendiendo LED {color}", icon="✅")
+                        time.sleep(0.5)  # Pequeña pausa entre comandos
+                    
+                    client1.disconnect()
+                    st.success("✅ Comandos enviados exitosamente")
+                except Exception as e:
+                    st.error(f"❌ Error al enviar comandos: {e}")
 
 # Icono de micrófono centrado
 col1, col2, col3 = st.columns([1, 2, 1])
@@ -390,7 +545,7 @@ with st.expander("🔧 Información de Conexión", expanded=False):
 st.markdown("---")
 st.markdown(
     "<div style='text-align: center; color: #666;'>"
-    "Control por Voz IoT | Streamlit + ESP32 + MQTT"
+    "Control por Voz IoT | Streamlit + ESP32 + MQTT | Detección de Colores"
     "</div>", 
     unsafe_allow_html=True
 )
