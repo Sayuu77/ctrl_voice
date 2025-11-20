@@ -11,20 +11,19 @@ import json
 from gtts import gTTS
 from googletrans import Translator
 
-def on_publish(client, userdata, result):
-    print("El dato ha sido publicado \n")
+def on_publish(client,userdata,result):             #create function for callback
+    print("el dato ha sido publicado \n")
     pass
 
 def on_message(client, userdata, message):
     global message_received
     time.sleep(2)
-    message_received = str(message.payload.decode("utf-8"))
-    st.write("Respuesta del Arduino:", message_received)
+    message_received=str(message.payload.decode("utf-8"))
+    st.write(message_received)
 
-# Configuración MQTT
-broker = "broker.mqttdashboard.com"
-port = 1883
-client1 = paho.Client("GIT-HUBC")
+broker="broker.mqttdashboard.com"
+port=1883
+client1= paho.Client("GIT-HUBC")
 client1.on_message = on_message
 
 st.title("INTERFACES MULTIMODALES")
@@ -35,11 +34,12 @@ st.image(image, width=200)
 
 st.write("Toca el Botón y habla ")
 
-# Instrucciones para el usuario con los comandos específicos
+# Agregar instrucciones para el usuario
 st.markdown("""
 ### Comandos de voz disponibles:
-- **Encender individual**: "enciende el verde", "enciende el rojo", "enciende el amarillo"
-- **Control general**: "enciende todos", "apaga todos"
+- **Para luces:** "enciende luz", "apaga luz", "enciende amarillo", "apaga rojo", etc.
+- **Para todos los LEDs:** "enciende todos los leds", "apaga todos los leds"
+- **Para puerta:** "abre puerta", "cierra puerta"
 """)
 
 stt_button = Button(label=" Inicio ", width=200)
@@ -48,8 +48,7 @@ stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'es-ES';
-
+ 
     recognition.onresult = function (e) {
         var value = "";
         for (var i = e.resultIndex; i < e.results.length; ++i) {
@@ -61,11 +60,6 @@ stt_button.js_on_event("button_click", CustomJS(code="""
             document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
         }
     }
-    
-    recognition.onerror = function (e) {
-        console.error('Error en reconocimiento de voz:', e.error);
-    }
-    
     recognition.start();
     """))
 
@@ -79,38 +73,73 @@ result = streamlit_bokeh_events(
 
 if result:
     if "GET_TEXT" in result:
-        comando = result.get("GET_TEXT").strip()
-        st.write("**Comando detectado:**", comando)
+        comando_voz = result.get("GET_TEXT").strip()
+        st.write(f"Comando detectado: {comando_voz}")
         
-        # Convertir TODO a minúsculas para consistencia
-        comando_normalizado = comando.lower()
-        st.write("**Comando normalizado:**", comando_normalizado)
+        # Procesar el comando y mostrar feedback
+        comando_minusculas = comando_voz.lower()
         
-        # Conectar y publicar el comando
-        try:
-            client1.on_publish = on_publish
-            client1.connect(broker, port)
+        # Determinar qué acción se está solicitando
+        if any(palabra in comando_minusculas for palabra in ["enciende", "apaga", "abre", "cierra", "amarillo", "rojo", "verde", "luz", "puerta"]):
+            st.success(f"Comando reconocido: '{comando_voz}'")
             
-            # Crear mensaje JSON con el comando en minúsculas
-            message = json.dumps({"Act1": comando_normalizado})
+            # Publicar el comando via MQTT
+            client1.on_publish = on_publish                            
+            client1.connect(broker,port)  
             
-            # Publicar en el topic correcto
+            # Enviar el comando exactamente como lo espera el Arduino
+            message = json.dumps({"Act1": comando_voz})
             ret = client1.publish("voice_ctrl", message)
             
-            if ret[0] == 0:
-                st.success(f"✅ Comando enviado: '{comando_normalizado}'")
-            else:
-                st.error("❌ Error al enviar el comando")
+            st.info("Comando enviado al Arduino via MQTT")
+            
+            # Mostrar confirmación visual del comando
+            if "enciende" in comando_minusculas and "luz" in comando_minusculas:
+                st.balloons()
+                st.success("💡 Luz principal encendida")
+            elif "apaga" in comando_minusculas and "luz" in comando_minusculas:
+                st.success("💡 Luz principal apagada")
+            elif "enciende" in comando_minusculas and "amarillo" in comando_minusculas:
+                st.success("🟡 LED amarillo encendido")
+            elif "apaga" in comando_minusculas and "amarillo" in comando_minusculas:
+                st.success("🟡 LED amarillo apagado")
+            elif "enciende" in comando_minusculas and "rojo" in comando_minusculas:
+                st.success("🔴 LED rojo encendido")
+            elif "apaga" in comando_minusculas and "rojo" in comando_minusculas:
+                st.success("🔴 LED rojo apagado")
+            elif "enciende" in comando_minusculas and "verde" in comando_minusculas:
+                st.success("🟢 LED verde encendido")
+            elif "apaga" in comando_minusculas and "verde" in comando_minusculas:
+                st.success("🟢 LED verde apagado")
+            elif "abre" in comando_minusculas and "puerta" in comando_minusculas:
+                st.success("🚪 Puerta abierta")
+            elif "cierra" in comando_minusculas and "puerta" in comando_minusculas:
+                st.success("🚪 Puerta cerrada")
                 
-        except Exception as e:
-            st.error(f"Error de conexión: {e}")
+        else:
+            st.warning("Comando no reconocido. Intenta con: 'enciende luz', 'apaga rojo', etc.")
+    
+    try:
+        os.mkdir("temp")
+    except:
+        pass
 
-# Sección para mostrar estado
+# Agregar sección de estado actual
 st.markdown("---")
 st.subheader("Estado del Sistema")
-st.info("Los comandos se envían al Arduino via MQTT. El estado se actualizará cuando el Arduino procese el comando.")
 
-try:
-    os.mkdir("temp")
-except:
-    pass
+# Botón para probar conexión
+if st.button("Probar conexión MQTT"):
+    try:
+        client1.connect(broker, port)
+        st.success("✅ Conexión MQTT establecida correctamente")
+    except Exception as e:
+        st.error(f"❌ Error en conexión MQTT: {e}")
+
+# Nota importante
+st.info("""
+**Nota:** Asegúrate de que:
+1. El Arduino esté conectado a Internet
+2. El topic MQTT sea 'voice_ctrl'
+3. Hables claro y uses los comandos especificados
+""")
