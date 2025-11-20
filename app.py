@@ -188,9 +188,14 @@ with col2:
 
 st.markdown('<div class="info-text">Haz clic en el botón y di tu comando de voz</div>', unsafe_allow_html=True)
 
-# Botón de reconocimiento de voz
-stt_button = Button(label=" Iniciar Reconocimiento de Voz ", width=300, height=60, 
-                   button_type="success", css_classes=["pulse"])
+# Botón de reconocimiento de vozfrom bokeh.layouts import column
+stt_button = Button(
+    label="🎤 Iniciar Reconocimiento de Voz",
+    button_type="success",
+    width=300,
+    height=60,
+    css_classes=["pulse"]
+)
 stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
     recognition.continuous = false;
