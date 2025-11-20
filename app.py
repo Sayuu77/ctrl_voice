@@ -439,7 +439,7 @@ if result:
         st.markdown(f'<div class="{clase_css}">{mensaje}</div>', unsafe_allow_html=True)
             
             # Enviar comando por MQTT
-            try:
+        try:
                 client1 = paho.Client("streamlit-voice-control")
                 client1.on_publish = on_publish
                 client1.connect(broker, port)
