@@ -130,6 +130,24 @@ st.markdown("""
     .led-todos { border-left-color: #9C27B0; }
     .luz-principal { border-left-color: #2196F3; }
     .puerta { border-left-color: #FF9800; }
+    .stt-button {
+        background: linear-gradient(135deg, #7E57C2, #BA68C8);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 15px 30px;
+        font-size: 1.2rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(126, 87, 194, 0.3);
+        margin: 20px auto;
+        display: block;
+    }
+    .stt-button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 20px rgba(126, 87, 194, 0.4);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -264,11 +282,22 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-    st.write("Toca el Botón y habla ")
+    # Icono de micrófono centrado
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown('<div class="mic-button pulse">🎤</div>', unsafe_allow_html=True)
 
-    # BOTÓN DE GRABACIÓN ACTUALIZADO - VISIBLE Y FUNCIONAL
-    stt_button = Button(label=" Inicio ", width=200)
+    st.markdown('<div class="info-text">Haz clic en el botón y di tu comando de voz</div>', unsafe_allow_html=True)
 
+    # BOTÓN DE GRABACIÓN CORREGIDO - AHORA SÍ SE MUESTRA
+    stt_button = Button(
+        label="🎤 Iniciar Reconocimiento de Voz", 
+        width=300, 
+        height=60,
+        button_type="success",
+        css_classes=["stt-button"]
+    )
+    
     stt_button.js_on_event("button_click", CustomJS(code="""
         var recognition = new webkitSpeechRecognition();
         recognition.continuous = true;
@@ -285,139 +314,162 @@ with tab1:
                 document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
             }
         }
+        
+        recognition.onstart = function() {
+            document.dispatchEvent(new CustomEvent("RECORDING_START"));
+        }
+        
+        recognition.onend = function() {
+            document.dispatchEvent(new CustomEvent("RECORDING_END"));
+        }
+        
+        recognition.onerror = function(e) {
+            document.dispatchEvent(new CustomEvent("RECORDING_ERROR", {detail: e.error}));
+        }
+        
         recognition.start();
-        """))
+    """))
 
+    # Procesar eventos - CORREGIDO para incluir todos los eventos
     result = streamlit_bokeh_events(
         stt_button,
-        events="GET_TEXT",
+        events="GET_TEXT,RECORDING_START,RECORDING_END,RECORDING_ERROR",
         key="listen",
         refresh_on_update=False,
         override_height=75,
-        debounce_time=0)
+        debounce_time=0
+    )
+
+    # Mostrar estado de grabación
+    if result:
+        if "RECORDING_START" in result:
+            st.info("🎤 Escuchando... Habla ahora")
+        if "RECORDING_END" in result:
+            st.success("✅ Grabación completada")
+        if "RECORDING_ERROR" in result:
+            st.error("❌ Error en el reconocimiento de voz")
 
     # Mostrar resultados del comando
-    if result:
-        if "GET_TEXT" in result:
-            command = result.get("GET_TEXT").strip()
+    if result and "GET_TEXT" in result:
+        command = result.get("GET_TEXT").strip()
+        
+        # Normalizar el comando
+        command = command.lower().strip(' .!?')
+        st.session_state.last_command = command
+        
+        # Mostrar comando reconocido
+        st.markdown("### 🎯 Comando Reconocido")
+        st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
+        
+        # Mapeo de comandos más flexible con control de encendido/apagado
+        command_mapping = {
+            # Comandos para ENCENDER LED Amarillo
+            'enciende el amarillo': 'enciende amarillo',
+            'prende el amarillo': 'enciende amarillo',
+            'enciende amarillo': 'enciende amarillo',
+            'enciende la luz amarilla': 'enciende amarillo',
+            'amarillo enciende': 'enciende amarillo',
             
-            # Normalizar el comando
-            command = command.lower().strip(' .!?')
-            st.session_state.last_command = command
+            # Comandos para APAGAR LED Amarillo
+            'apaga el amarillo': 'apaga amarillo',
+            'apaga amarillo': 'apaga amarillo',
             
-            # Mostrar comando reconocido
-            st.markdown("### 🎯 Comando Reconocido")
-            st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
+            # Comandos para ENCENDER LED Rojo
+            'enciende el rojo': 'enciende rojo',
+            'prende el rojo': 'enciende rojo',
+            'enciende rojo': 'enciende rojo',
+            'enciende la luz roja': 'enciende rojo',
+            'rojo enciende': 'enciende rojo',
             
-            # Mapeo de comandos más flexible con control de encendido/apagado
-            command_mapping = {
-                # Comandos para ENCENDER LED Amarillo
-                'enciende el amarillo': 'enciende amarillo',
-                'prende el amarillo': 'enciende amarillo',
-                'enciende amarillo': 'enciende amarillo',
-                'enciende la luz amarilla': 'enciende amarillo',
-                'amarillo enciende': 'enciende amarillo',
-                
-                # Comandos para APAGAR LED Amarillo
-                'apaga el amarillo': 'apaga amarillo',
-                'apaga amarillo': 'apaga amarillo',
-                
-                # Comandos para ENCENDER LED Rojo
-                'enciende el rojo': 'enciende rojo',
-                'prende el rojo': 'enciende rojo',
-                'enciende rojo': 'enciende rojo',
-                'enciende la luz roja': 'enciende rojo',
-                'rojo enciende': 'enciende rojo',
-                
-                # Comandos para APAGAR LED Rojo
-                'apaga el rojo': 'apaga rojo',
-                'apaga rojo': 'apaga rojo',
-                
-                # Comandos para ENCENDER LED Verde
-                'enciende el verde': 'enciende verde',
-                'prende el verde': 'enciende verde',
-                'enciende verde': 'enciende verde',
-                'enciende la luz verde': 'enciende verde',
-                'verde enciende': 'enciende verde',
-                
-                # Comandos para APAGAR LED Verde
-                'apaga el verde': 'apaga verde',
-                'apaga verde': 'apaga verde',
-                
-                # Comandos para TODOS los LEDs
-                'enciende todos los leds': 'enciende todos los leds',
-                'prende todos los leds': 'enciende todos los leds',
-                'enciende todos los led': 'enciende todos los leds',
-                'apaga todos los leds': 'apaga todos los leds',
-                'apaga todos los led': 'apaga todos los leds',
-                
-                # Comandos para luz principal
-                'enciende las luces': 'enciende luz',
-                'prende las luces': 'enciende luz', 
-                'enciende la luz': 'enciende luz',
-                'prende la luz': 'enciende luz',
-                'apaga las luces': 'apaga luz',
-                'apaga la luz': 'apaga luz',
-                
-                # Comandos para puerta
-                'abre la puerta': 'abre puerta',
-                'abre puerta': 'abre puerta',
-                'cierra la puerta': 'cierra puerta',
-                'cierra puerta': 'cierra puerta',
-                
-                # Comandos simples (sin "enciende/apaga" - por defecto encienden)
-                'amarillo': 'enciende amarillo',
-                'rojo': 'enciende rojo',
-                'verde': 'enciende verde',
-            }
+            # Comandos para APAGAR LED Rojo
+            'apaga el rojo': 'apaga rojo',
+            'apaga rojo': 'apaga rojo',
             
-            # Buscar comando similar
-            normalized_command = command_mapping.get(command, command)
+            # Comandos para ENCENDER LED Verde
+            'enciende el verde': 'enciende verde',
+            'prende el verde': 'enciende verde',
+            'enciende verde': 'enciende verde',
+            'enciende la luz verde': 'enciende verde',
+            'verde enciende': 'enciende verde',
             
-            # Determinar si es comando de encendido o apagado
-            es_encendido = normalized_command.startswith('enciende')
-            es_apagado = normalized_command.startswith('apaga')
+            # Comandos para APAGAR LED Verde
+            'apaga el verde': 'apaga verde',
+            'apaga verde': 'apaga verde',
             
-            # Mostrar feedback visual del comando normalizado
-            color_indicators = {
-                'enciende amarillo': ('🟡 ENCENDIENDO LED AMARILLO', 'status-indicator'),
-                'apaga amarillo': ('🔴 APAGANDO LED AMARILLO', 'status-indicator-off'),
-                'enciende rojo': ('🔴 ENCENDIENDO LED ROJO', 'status-indicator'),
-                'apaga rojo': ('🔴 APAGANDO LED ROJO', 'status-indicator-off'),
-                'enciende verde': ('🟢 ENCENDIENDO LED VERDE', 'status-indicator'),
-                'apaga verde': ('🔴 APAGANDO LED VERDE', 'status-indicator-off'),
-                'enciende todos los leds': ('🌈 ENCENDIENDO TODOS LOS LEDs', 'status-indicator'),
-                'apaga todos los leds': ('🔴 APAGANDO TODOS LOS LEDs', 'status-indicator-off'),
-                'enciende luz': ('💡 ENCENDIENDO LUZ PRINCIPAL', 'status-indicator'),
-                'apaga luz': ('🔌 APAGANDO LUZ PRINCIPAL', 'status-indicator-off'),
-                'abre puerta': ('🚪 ABRIENDO PUERTA', 'status-indicator'),
-                'cierra puerta': ('🚪 CERRANDO PUERTA', 'status-indicator-off')
-            }
+            # Comandos para TODOS los LEDs
+            'enciende todos los leds': 'enciende todos los leds',
+            'prende todos los leds': 'enciende todos los leds',
+            'enciende todos los led': 'enciende todos los leds',
+            'apaga todos los leds': 'apaga todos los leds',
+            'apaga todos los led': 'apaga todos los leds',
             
-            mensaje, clase_css = color_indicators.get(normalized_command, (f'⚡ {normalized_command}', 'status-indicator'))
+            # Comandos para luz principal
+            'enciende las luces': 'enciende luz',
+            'prende las luces': 'enciende luz', 
+            'enciende la luz': 'enciende luz',
+            'prende la luz': 'enciende luz',
+            'apaga las luces': 'apaga luz',
+            'apaga la luz': 'apaga luz',
             
-            st.markdown(f'<div class="{clase_css}">{mensaje}</div>', unsafe_allow_html=True)
+            # Comandos para puerta
+            'abre la puerta': 'abre puerta',
+            'abre puerta': 'abre puerta',
+            'cierra la puerta': 'cierra puerta',
+            'cierra puerta': 'cierra puerta',
             
-            # Enviar comando por MQTT
-            try:
-                client1 = paho.Client("streamlit-voice-control")
-                client1.on_publish = on_publish
-                client1.connect(broker, port)
-                message = json.dumps({"Act1": normalized_command})
-                ret = client1.publish("appcolor", message)
+            # Comandos simples (sin "enciende/apaga" - por defecto encienden)
+            'amarillo': 'enciende amarillo',
+            'rojo': 'enciende rojo',
+            'verde': 'enciende verde',
+        }
+        
+        # Buscar comando similar
+        normalized_command = command_mapping.get(command, command)
+        
+        # Determinar si es comando de encendido o apagado
+        es_encendido = normalized_command.startswith('enciende')
+        es_apagado = normalized_command.startswith('apaga')
+        
+        # Mostrar feedback visual del comando normalizado
+        color_indicators = {
+            'enciende amarillo': ('🟡 ENCENDIENDO LED AMARILLO', 'status-indicator'),
+            'apaga amarillo': ('🔴 APAGANDO LED AMARILLO', 'status-indicator-off'),
+            'enciende rojo': ('🔴 ENCENDIENDO LED ROJO', 'status-indicator'),
+            'apaga rojo': ('🔴 APAGANDO LED ROJO', 'status-indicator-off'),
+            'enciende verde': ('🟢 ENCENDIENDO LED VERDE', 'status-indicator'),
+            'apaga verde': ('🔴 APAGANDO LED VERDE', 'status-indicator-off'),
+            'enciende todos los leds': ('🌈 ENCENDIENDO TODOS LOS LEDs', 'status-indicator'),
+            'apaga todos los leds': ('🔴 APAGANDO TODOS LOS LEDs', 'status-indicator-off'),
+            'enciende luz': ('💡 ENCENDIENDO LUZ PRINCIPAL', 'status-indicator'),
+            'apaga luz': ('🔌 APAGANDO LUZ PRINCIPAL', 'status-indicator-off'),
+            'abre puerta': ('🚪 ABRIENDO PUERTA', 'status-indicator'),
+            'cierra puerta': ('🚪 CERRANDO PUERTA', 'status-indicator-off')
+        }
+        
+        mensaje, clase_css = color_indicators.get(normalized_command, (f'⚡ {normalized_command}', 'status-indicator'))
+        
+        st.markdown(f'<div class="{clase_css}">{mensaje}</div>', unsafe_allow_html=True)
+        
+        # Enviar comando por MQTT
+        try:
+            client1 = paho.Client("streamlit-voice-control")
+            client1.on_publish = on_publish
+            client1.connect(broker, port)
+            message = json.dumps({"Act1": normalized_command})
+            ret = client1.publish("appcolor", message)
+            
+            # Toast personalizado según el tipo de comando
+            if es_encendido:
+                st.toast(f"💡 Encendiendo: {normalized_command}", icon="✅")
+            elif es_apagado:
+                st.toast(f"🔌 Apagando: {normalized_command}", icon="🔴")
+            else:
+                st.toast(f"📡 Comando enviado: {normalized_command}", icon="✅")
                 
-                # Toast personalizado según el tipo de comando
-                if es_encendido:
-                    st.toast(f"💡 Encendiendo: {normalized_command}", icon="✅")
-                elif es_apagado:
-                    st.toast(f"🔌 Apagando: {normalized_command}", icon="🔴")
-                else:
-                    st.toast(f"📡 Comando enviado: {normalized_command}", icon="✅")
-                    
-                time.sleep(1)  # Dar tiempo para que se envíe el mensaje
-                client1.disconnect()
-            except Exception as e:
-                st.error(f"❌ Error al enviar comando: {e}")
+            time.sleep(1)  # Dar tiempo para que se envíe el mensaje
+            client1.disconnect()
+        except Exception as e:
+            st.error(f"❌ Error al enviar comando: {e}")
 
     # Historial de comandos
     if st.session_state.last_command:
@@ -445,6 +497,7 @@ with tab1:
             st.error("❌ No se puede conectar al broker MQTT")
 
 with tab2:
+    # ... (el código del detector de colores permanece exactamente igual)
     st.title("🎯 Detector de Colores: Amarillo, Verde, Rojo")
     
     with st.sidebar:
@@ -566,7 +619,7 @@ with tab2:
             
             with col_crop:
                 st.image(cropped_image, caption="Área que se analizará", use_container_width=True)
-                st.markdown("**Solo esta part se procesará**")
+                st.markdown("**Solo esta parte se procesará**")
             
             # Convertir imagen recortada para upload
             image_bytes = pil_to_bytes(cropped_image)
