@@ -264,62 +264,37 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-    # Icono de micrófono centrado
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown('<div class="mic-button pulse">🎤</div>', unsafe_allow_html=True)
+    st.write("Toca el Botón y habla ")
 
-    st.markdown('<div class="info-text">Haz clic en el botón y di tu comando de voz</div>', unsafe_allow_html=True)
+    # BOTÓN DE GRABACIÓN ACTUALIZADO - VISIBLE Y FUNCIONAL
+    stt_button = Button(label=" Inicio ", width=200)
 
-    # Botón de reconocimiento de voz - VISIBLE
-    stt_button = Button(label=" Iniciar Reconocimiento de Voz ", width=300, height=60, 
-                       button_type="success", css_classes=["pulse"])
     stt_button.js_on_event("button_click", CustomJS(code="""
         var recognition = new webkitSpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'es-ES';
-
-        recognition.onstart = function() {
-            document.dispatchEvent(new CustomEvent("RECORDING_START"));
-        }
-
+        recognition.continuous = true;
+        recognition.interimResults = true;
+     
         recognition.onresult = function (e) {
-            var value = e.results[0][0].transcript;
+            var value = "";
+            for (var i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) {
+                    value += e.results[i][0].transcript;
+                }
+            }
             if ( value != "") {
                 document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
             }
         }
-
-        recognition.onerror = function(e) {
-            document.dispatchEvent(new CustomEvent("RECORDING_ERROR", {detail: e.error}));
-        }
-
-        recognition.onend = function() {
-            document.dispatchEvent(new CustomEvent("RECORDING_END"));
-        }
-
         recognition.start();
-    """))
+        """))
 
-    # Procesar eventos
     result = streamlit_bokeh_events(
         stt_button,
-        events="GET_TEXT,RECORDING_START,RECORDING_END,RECORDING_ERROR",
+        events="GET_TEXT",
         key="listen",
         refresh_on_update=False,
-        override_height=80,
-        debounce_time=0
-    )
-
-    # Mostrar estado de grabación
-    if result:
-        if "RECORDING_START" in result:
-            st.info("🎤 Escuchando... Habla ahora")
-        if "RECORDING_END" in result:
-            st.success("✅ Grabación completada")
-        if "RECORDING_ERROR" in result:
-            st.error("❌ Error en el reconocimiento de voz")
+        override_height=75,
+        debounce_time=0)
 
     # Mostrar resultados del comando
     if result:
@@ -591,7 +566,7 @@ with tab2:
             
             with col_crop:
                 st.image(cropped_image, caption="Área que se analizará", use_container_width=True)
-                st.markdown("**Solo esta parte se procesará**")
+                st.markdown("**Solo esta part se procesará**")
             
             # Convertir imagen recortada para upload
             image_bytes = pil_to_bytes(cropped_image)
