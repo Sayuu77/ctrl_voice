@@ -1,420 +1,267 @@
 import streamlit as st
-import pyaudio
-import wave
-import speech_recognition as sr
 import cv2
 import numpy as np
-from PIL import Image
-import time
-import json
 import paho.mqtt.client as mqtt
-import threading
-
-# Configuración de la página
-st.set_page_config(
-    page_title="Control de LEDs por Voz y Cámara",
-    page_icon="🎮",
-    layout="wide"
-)
-
-# Variables globales para MQTT
-MQTT_BROKER = "broker.mqttdashboard.com"
-MQTT_TOPIC = "appcolor"
-mqtt_client = None
-
-# Inicializar el reconocedor de voz
-recognizer = sr.Recognizer()
+from PIL import Image
+import io
+import time
+import speech_recognition as sr
 
 # Configuración MQTT
-def setup_mqtt():
-    global mqtt_client
-    try:
-        mqtt_client = mqtt.Client("streamlit_app")
-        mqtt_client.connect(MQTT_BROKER, 1883, 60)
-        mqtt_client.loop_start()
-        return True
-    except Exception as e:
-        st.error(f"Error conectando a MQTT: {e}")
-        return False
+MQTT_BROKER = "broker.mqttdashboard.com"
+MQTT_TOPIC = "appcolor"
 
-# Función para enviar comandos a Arduino
-def send_command(command):
-    global mqtt_client
-    if mqtt_client:
+class LEDController:
+    def __init__(self):
+        self.mqtt_client = mqtt.Client()
+        self.setup_mqtt()
+        
+    def setup_mqtt(self):
         try:
-            message = json.dumps({"Act1": command})
-            mqtt_client.publish(MQTT_TOPIC, message)
+            self.mqtt_client.connect(MQTT_BROKER, 1883, 60)
+            self.mqtt_client.loop_start()
+        except Exception as e:
+            st.error(f"Error conectando a MQTT: {e}")
+    
+    def send_command(self, command):
+        """Envía comando a Arduino via MQTT"""
+        try:
+            message = f'{{"Act1":"{command}"}}'
+            self.mqtt_client.publish(MQTT_TOPIC, message)
             st.success(f"Comando enviado: {command}")
             return True
         except Exception as e:
             st.error(f"Error enviando comando: {e}")
             return False
-    else:
-        st.error("Cliente MQTT no conectado")
-        return False
 
-# Función para grabar audio
-def record_audio(filename, duration=3):
-    CHUNK = 1024
-    FORMAT = pyaudio.paInt16
-    CHANNELS = 1
-    RATE = 44100
+class ColorDetector:
+    def __init__(self):
+        # Rangos de color en HSV
+        self.color_ranges = {
+            'rojo': [
+                (np.array([0, 120, 70]), np.array([10, 255, 255])),
+                (np.array([170, 120, 70]), np.array([180, 255, 255]))
+            ],
+            'verde': [(np.array([40, 40, 40]), np.array([80, 255, 255]))],
+            'amarillo': [(np.array([20, 100, 100]), np.array([30, 255, 255]))]
+        }
     
-    p = pyaudio.PyAudio()
-    
-    stream = p.open(format=FORMAT,
-                    channels=CHANNELS,
-                    rate=RATE,
-                    input=True,
-                    frames_per_buffer=CHUNK)
-    
-    st.info("🎙️ Grabando... Habla ahora!")
-    frames = []
-    
-    for i in range(0, int(RATE / CHUNK * duration)):
-        data = stream.read(CHUNK)
-        frames.append(data)
-    
-    stream.stop_stream()
-    stream.close()
-    p.terminate()
-    
-    # Guardar archivo WAV
-    wf = wave.open(filename, 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(p.get_sample_size(FORMAT))
-    wf.setframerate(RATE)
-    wf.writeframes(b''.join(frames))
-    wf.close()
-
-# Función para transcribir audio
-def transcribe_audio(filename):
-    try:
-        with sr.AudioFile(filename) as source:
-            audio = recognizer.record(source)
+    def detect_colors(self, image):
+        """Detecta colores rojo, verde y amarillo en la imagen"""
+        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        detected_colors = []
         
-        text = recognizer.recognize_google(audio, language='es-ES')
-        return text.lower()
-    except sr.UnknownValueError:
+        for color_name, ranges in self.color_ranges.items():
+            mask = np.zeros(hsv.shape[:2], dtype=np.uint8)
+            
+            for lower, upper in ranges:
+                color_mask = cv2.inRange(hsv, lower, upper)
+                mask = cv2.bitwise_or(mask, color_mask)
+            
+            # Encontrar contornos
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                if area > 500:  # Área mínima para considerar detección
+                    detected_colors.append(color_name)
+                    break
+        
+        return list(set(detected_colors))  # Remover duplicados
+
+class VoiceController:
+    def __init__(self):
+        self.recognizer = sr.Recognizer()
+        self.microphone = sr.Microphone()
+        
+        # Comandos de voz reconocidos
+        self.voice_commands = {
+            'rojo': 'rojo',
+            'verde': 'verde', 
+            'amarillo': 'amarillo',
+            'encender todos': 'enciende todos los leds',
+            'apagar todos': 'apaga todos los leds',
+            'encender luz': 'enciende luz',
+            'apagar luz': 'apaga luz'
+        }
+    
+    def listen_command(self):
+        """Escucha y reconoce comandos de voz"""
+        try:
+            with self.microphone as source:
+                st.info("Escuchando... Habla ahora")
+                self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=3)
+            
+            try:
+                text = self.recognizer.recognize_google(audio, language='es-ES').lower()
+                st.success(f"Reconocido: {text}")
+                return text
+            except sr.UnknownValueError:
+                st.error("No se pudo entender el audio")
+                return None
+            except sr.RequestError:
+                st.error("Error en el servicio de reconocimiento")
+                return None
+                
+        except sr.WaitTimeoutError:
+            st.error("Tiempo de espera agotado")
+            return None
+        except Exception as e:
+            st.error(f"Error en reconocimiento de voz: {e}")
+            return None
+    
+    def process_voice_command(self, text):
+        """Procesa el texto reconocido y devuelve el comando correspondiente"""
+        if not text:
+            return None
+            
+        for voice_cmd, arduino_cmd in self.voice_commands.items():
+            if voice_cmd in text:
+                return arduino_cmd
+        
+        # Comandos simples de colores
+        if any(color in text for color in ['rojo', 'verde', 'amarillo']):
+            for color in ['rojo', 'verde', 'amarillo']:
+                if color in text:
+                    return color
+        
         return None
-    except sr.RequestError as e:
-        st.error(f"Error en el servicio de reconocimiento: {e}")
-        return None
 
-# Función para procesar comandos de voz
-def process_voice_command(command):
-    command = command.lower().strip()
-    
-    # Mapeo de comandos de voz a acciones
-    command_mapping = {
-        'rojo': 'rojo',
-        'amarillo': 'amarillo', 
-        'verde': 'verde',
-        'encender rojo': 'rojo',
-        'encender amarillo': 'amarillo',
-        'encender verde': 'verde',
-        'prender rojo': 'rojo',
-        'prender amarillo': 'amarillo', 
-        'prender verde': 'verde',
-        'apagar todo': 'apaga todos los leds',
-        'encender todos': 'enciende todos los leds',
-        'apagar rojo': 'apaga rojo',
-        'apagar amarillo': 'apaga amarillo',
-        'apagar verde': 'apaga verde',
-        'luz': 'enciende luz',
-        'apagar luz': 'apaga luz',
-        'abrir puerta': 'abre puerta',
-        'cerrar puerta': 'cierra puerta'
-    }
-    
-    # Buscar coincidencia exacta o parcial
-    for voice_cmd, action in command_mapping.items():
-        if voice_cmd in command:
-            return action
-    
-    # Si no encuentra coincidencia, intentar con palabras individuales
-    words = command.split()
-    for word in words:
-        if word in ['rojo', 'amarillo', 'verde']:
-            return word
-    
-    return None
-
-# Función para detectar colores en la imagen
-def detect_colors(image):
-    # Convertir PIL Image a OpenCV
-    img_cv = np.array(image)
-    img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGB2BGR)
-    
-    # Convertir a HSV para mejor detección de colores
-    hsv = cv2.cvtColor(img_cv, cv2.COLOR_BGR2HSV)
-    
-    # Definir rangos de colores en HSV
-    # Rojo
-    red_lower1 = np.array([0, 120, 70])
-    red_upper1 = np.array([10, 255, 255])
-    red_lower2 = np.array([170, 120, 70])
-    red_upper2 = np.array([180, 255, 255])
-    
-    # Amarillo
-    yellow_lower = np.array([20, 100, 100])
-    yellow_upper = np.array([30, 255, 255])
-    
-    # Verde
-    green_lower = np.array([36, 100, 100])
-    green_upper = np.array([86, 255, 255])
-    
-    # Crear máscaras
-    red_mask1 = cv2.inRange(hsv, red_lower1, red_upper1)
-    red_mask2 = cv2.inRange(hsv, red_lower2, red_upper2)
-    red_mask = cv2.bitwise_or(red_mask1, red_mask2)
-    
-    yellow_mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
-    green_mask = cv2.inRange(hsv, green_lower, green_upper)
-    
-    # Calcular porcentaje de cada color
-    total_pixels = img_cv.shape[0] * img_cv.shape[1]
-    
-    red_percent = (cv2.countNonZero(red_mask) / total_pixels) * 100
-    yellow_percent = (cv2.countNonZero(yellow_mask) / total_pixels) * 100
-    green_percent = (cv2.countNonZero(green_mask) / total_pixels) * 100
-    
-    detected_colors = []
-    
-    # Umbral para considerar que el color está presente
-    threshold = 1.0  # 1% de la imagen
-    
-    if red_percent > threshold:
-        detected_colors.append('rojo')
-    if yellow_percent > threshold:
-        detected_colors.append('amarillo')
-    if green_percent > threshold:
-        detected_colors.append('verde')
-    
-    # Crear imagen con detecciones visuales
-    result_img = img_cv.copy()
-    
-    # Resaltar áreas detectadas
-    if 'rojo' in detected_colors:
-        result_img[red_mask > 0] = [0, 0, 255]  # Rojo en BGR
-    if 'amarillo' in detected_colors:
-        result_img[yellow_mask > 0] = [0, 255, 255]  # Amarillo en BGR
-    if 'verde' in detected_colors:
-        result_img[green_mask > 0] = [0, 255, 0]  # Verde en BGR
-    
-    result_img = cv2.cvtColor(result_img, cv2.COLOR_BGR2RGB)
-    
-    return detected_colors, result_img, {
-        'rojo': red_percent,
-        'amarillo': yellow_percent, 
-        'verde': green_percent
-    }
-
-# Interfaz principal de Streamlit
 def main():
-    st.title("🎮 Control de LEDs por Voz y Cámara")
-    st.markdown("Controla los LEDs mediante comandos de voz o detección de colores por cámara")
+    st.set_page_config(page_title="Control de LEDs por Voz y Cámara", layout="wide")
     
-    # Inicializar MQTT
-    if 'mqtt_connected' not in st.session_state:
-        st.session_state.mqtt_connected = setup_mqtt()
+    st.title("🎤 Control de LEDs por Voz y Cámara")
+    st.markdown("Controla LEDs Arduino con comandos de voz o detección de colores desde la cámara")
     
-    # Sidebar para controles
+    # Inicializar controladores
+    if 'led_controller' not in st.session_state:
+        st.session_state.led_controller = LEDController()
+    if 'color_detector' not in st.session_state:
+        st.session_state.color_detector = ColorDetector()
+    if 'voice_controller' not in st.session_state:
+        st.session_state.voice_controller = VoiceController()
+    
+    # Sidebar para controles manuales
     with st.sidebar:
-        st.header("⚙️ Configuración")
+        st.header("🔄 Controles Manuales")
         
-        st.subheader("Control por Voz")
-        voice_duration = st.slider("Duración de grabación (segundos)", 1, 5, 3)
+        st.subheader("Controles Individuales")
+        col1, col2 = st.columns(2)
         
-        st.subheader("Control por Cámara")
-        camera_col = st.color_picker("Color de referencia", "#FF0000")
-        detection_threshold = st.slider("Umbral de detección (%)", 0.1, 5.0, 1.0)
+        with col1:
+            if st.button("🔴 Rojo"):
+                st.session_state.led_controller.send_command("rojo")
+            if st.button("🟢 Verde"):
+                st.session_state.led_controller.send_command("verde")
+            if st.button("🟡 Amarillo"):
+                st.session_state.led_controller.send_command("amarillo")
         
-        st.subheader("Estado del Sistema")
-        if st.session_state.mqtt_connected:
-            st.success("✅ Conectado a MQTT")
-        else:
-            st.error("❌ No conectado a MQTT")
+        with col2:
+            if st.button("💡 Luz"):
+                st.session_state.led_controller.send_command("enciende luz")
+            if st.button("🚪 Abrir Puerta"):
+                st.session_state.led_controller.send_command("abre puerta")
+            if st.button("🔒 Cerrar Puerta"):
+                st.session_state.led_controller.send_command("cierra puerta")
+        
+        st.subheader("Controles Grupales")
+        if st.button("✨ Encender Todos"):
+            st.session_state.led_controller.send_command("enciende todos los leds")
+        if st.button("💤 Apagar Todos"):
+            st.session_state.led_controller.send_command("apaga todos los leds")
     
-    # Crear pestañas para diferentes funcionalidades
-    tab1, tab2, tab3 = st.tabs(["🎤 Control por Voz", "📷 Control por Cámara", "🎯 Comandos Rápidos"])
+    # Pestañas principales
+    tab1, tab2 = st.tabs(["🎤 Control por Voz", "📷 Detección por Cámara"])
     
     with tab1:
         st.header("Control por Comandos de Voz")
         
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns([2, 1])
         
         with col1:
-            st.subheader("Grabar Comando")
-            if st.button("🎤 Iniciar Grabación de Voz", use_container_width=True):
-                with st.spinner("Preparando grabación..."):
-                    audio_file = "voice_command.wav"
-                    record_audio(audio_file, voice_duration)
-                    
-                    # Transcribir audio
-                    transcribed_text = transcribe_audio(audio_file)
-                    
-                    if transcribed_text:
-                        st.success(f"🎯 Comando detectado: '{transcribed_text}'")
-                        
-                        # Procesar comando
-                        command = process_voice_command(transcribed_text)
-                        if command:
-                            if send_command(command):
-                                st.balloons()
-                        else:
-                            st.error("Comando no reconocido. Intenta con: 'rojo', 'amarillo', 'verde', etc.")
-                    else:
-                        st.error("No se pudo entender el comando. Intenta nuevamente.")
-        
-        with col2:
-            st.subheader("Comandos de Voz Disponibles")
+            st.subheader("Instrucciones de Voz")
             st.markdown("""
-            **Colores básicos:**
-            - "rojo", "amarillo", "verde"
-            
-            **Comandos completos:**
-            - "encender rojo/amarillo/verde"
-            - "apagar rojo/amarillo/verde" 
-            - "encender todos", "apagar todo"
-            - "luz", "apagar luz"
-            - "abrir puerta", "cerrar puerta"
+            **Comandos reconocidos:**
+            - **Colores simples**: "rojo", "verde", "amarillo"
+            - **Comandos completos**: "encender todos", "apagar todos"
+            - **Control de luz**: "encender luz", "apagar luz"
             """)
             
-            st.subheader("Último Comando")
-            if 'last_command' in st.session_state:
-                st.info(f"Último comando: {st.session_state.last_command}")
+            if st.button("🎤 Iniciar Reconocimiento de Voz", type="primary"):
+                with st.spinner("Procesando comando de voz..."):
+                    voice_text = st.session_state.voice_controller.listen_command()
+                    
+                    if voice_text:
+                        command = st.session_state.voice_controller.process_voice_command(voice_text)
+                        if command:
+                            st.session_state.led_controller.send_command(command)
+                        else:
+                            st.warning("Comando de voz no reconocido")
+        
+        with col2:
+            st.subheader("Estado Actual")
+            st.info("Listo para recibir comandos de voz")
+            
+            st.subheader("Comandos Rápidos")
+            quick_commands = ["rojo", "verde", "amarillo", "enciende todos los leds"]
+            for cmd in quick_commands:
+                if st.button(f"Decir: '{cmd}'", key=f"quick_{cmd}"):
+                    st.session_state.led_controller.send_command(cmd)
     
     with tab2:
-        st.header("Control por Detección de Colores")
+        st.header("Detección de Colores por Cámara")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.subheader("Capturar Imagen")
-            camera_input = st.camera_input("Toma una foto con la cámara")
+            st.subheader("Captura de Imagen")
+            picture = st.camera_input("Toma una foto para detectar colores")
             
-            if camera_input is not None:
-                image = Image.open(camera_input)
+            if picture is not None:
+                # Convertir la imagen a formato OpenCV
+                image_data = picture.getvalue()
+                image = Image.open(io.BytesIO(image_data))
+                image_np = np.array(image)
                 
                 # Detectar colores
-                detected_colors, result_img, percentages = detect_colors(image)
+                detected_colors = st.session_state.color_detector.detect_colors(image_np)
                 
                 # Mostrar resultados
                 st.subheader("Resultados de Detección")
-                
                 if detected_colors:
-                    st.success(f"🎨 Colores detectados: {', '.join(detected_colors)}")
+                    st.success(f"Colores detectados: {', '.join(detected_colors)}")
                     
                     # Encender LEDs según colores detectados
                     for color in detected_colors:
-                        if send_command(color):
-                            st.info(f"✅ Encendiendo LED {color}")
+                        st.session_state.led_controller.send_command(color)
+                        time.sleep(0.5)  # Pequeña pausa entre comandos
                 else:
-                    st.warning("⚠️ No se detectaron los colores buscados")
+                    st.warning("No se detectaron colores (rojo, verde, amarillo)")
                 
-                # Mostrar porcentajes
-                st.write("**Porcentajes de detección:**")
-                for color, percent in percentages.items():
-                    st.write(f"- {color.capitalize()}: {percent:.2f}%")
+                # Mostrar imagen procesada
+                st.image(image, caption="Imagen capturada", use_column_width=True)
         
         with col2:
-            st.subheader("Imagen Procesada")
-            if camera_input is not None:
-                st.image(result_img, caption="Áreas de color detectadas", use_column_width=True)
-                
-                # Leyenda de colores
-                st.markdown("""
-                **Leyenda:**
-                - 🔴 Rojo: LED Rojo
-                - 🟡 Amarillo: LED Amarillo  
-                - 🟢 Verde: LED Verde
-                """)
-    
-    with tab3:
-        st.header("Comandos Rápidos")
-        
-        st.subheader("Control Individual de LEDs")
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("🔴 Encender Rojo", use_container_width=True):
-                send_command("rojo")
-            if st.button("⚫ Apagar Rojo", use_container_width=True):
-                send_command("apaga rojo")
-                
-        with col2:
-            if st.button("🟡 Encender Amarillo", use_container_width=True):
-                send_command("amarillo")
-            if st.button("⚫ Apagar Amarillo", use_container_width=True):
-                send_command("apaga amarillo")
-                
-        with col3:
-            if st.button("🟢 Encender Verde", use_container_width=True):
-                send_command("verde")
-            if st.button("⚫ Apagar Verde", use_container_width=True):
-                send_command("apaga verde")
-        
-        st.subheader("Control Grupal")
-        col4, col5 = st.columns(2)
-        
-        with col4:
-            if st.button("🎯 Encender Todos los LEDs", use_container_width=True):
-                send_command("enciende todos los leds")
-                
-        with col5:
-            if st.button("💤 Apagar Todos los LEDs", use_container_width=True):
-                send_command("apaga todos los leds")
-        
-        st.subheader("Otros Controles")
-        col6, col7, col8 = st.columns(3)
-        
-        with col6:
-            if st.button("💡 Encender Luz", use_container_width=True):
-                send_command("enciende luz")
-            if st.button("🌙 Apagar Luz", use_container_width=True):
-                send_command("apaga luz")
-                
-        with col7:
-            if st.button("🚪 Abrir Puerta", use_container_width=True):
-                send_command("abre puerta")
-                
-        with col8:
-            if st.button("🔒 Cerrar Puerta", use_container_width=True):
-                send_command("cierra puerta")
-
-    # Footer
-    st.markdown("---")
-    st.markdown("### 📊 Estado del Sistema")
-    
-    status_col1, status_col2, status_col3 = st.columns(3)
-    
-    with status_col1:
-        st.metric("Conexión MQTT", "Conectado" if st.session_state.mqtt_connected else "Desconectado")
-    
-    with status_col2:
-        st.metric("Servicio de Voz", "Activo")
-    
-    with status_col3:
-        st.metric("Detección de Colores", "Listo")
-
-# Instrucciones de instalación
-def show_installation_instructions():
-    st.sidebar.markdown("---")
-    st.sidebar.header("📋 Instalación Requerida")
-    st.sidebar.markdown("""
-    ```bash
-    pip install streamlit pyaudio speechrecognition opencv-python pillow paho-mqtt
-    ```
-    
-    **Nota para Windows:**
-    - Puede necesitar `pip install pipwin` y luego `pipwin install pyaudio`
-    
-    **Nota para macOS:**
-    - `brew install portaudio`
-    - `pip install pyaudio`
-    """)
+            st.subheader("Información de Detección")
+            st.markdown("""
+            **Colores que detecta:**
+            - 🔴 **Rojo**: LEDs rojos, objetos rojos
+            - 🟢 **Verde**: LEDs verdes, objetos verdes  
+            - 🟡 **Amarillo**: LEDs amarillos, objetos amarillos
+            
+            **Cómo usar:**
+            1. Toma una foto de un objeto con uno de estos colores
+            2. La app detectará automáticamente los colores
+            3. Se encenderán los LEDs correspondientes
+            """)
+            
+            st.subheader("Configuración")
+            auto_detect = st.checkbox("Encender LEDs automáticamente al detectar colores", value=True)
+            if auto_detect:
+                st.info("Los LEDs se encenderán automáticamente")
+            else:
+                st.warning("La detección solo mostrará resultados")
 
 if __name__ == "__main__":
-    show_installation_instructions()
     main()
