@@ -327,16 +327,10 @@ with tab1:
     
     # Botón principal de micrófono
     button_html = """
-    <script>
-        function triggerBokehEvent(){
-            document.querySelector("#bokeh_btn button").click();
-        }
-    </script>
-
-    <div class="mic-button-main %s" onclick="triggerBokehEvent()">
+    <div class="mic-button-main %s" onclick="this.dispatchEvent(new CustomEvent('button_click', {bubbles: true}))">
         🎤
     </div>
-""" % ("recording" if st.session_state.recording else "")
+    """ % ("recording" if st.session_state.recording else "")
     
     st.markdown(button_html, unsafe_allow_html=True)
     
@@ -353,19 +347,8 @@ with tab1:
     st.markdown('</div>', unsafe_allow_html=True)  # Close voice-section
 
     # Botón de reconocimiento de voz (funcionalidad)
-    stt_button = Button(
-    label="Iniciar Reconocimiento de Voz",
-    width=1,
-    height=1,
-    button_type="success",
-    css_classes=["hidden-button"],
-    name="bokeh_btn"
-)
-
-# Renderiza el botón con ID
-bokeh_container = st.empty()
-bokeh_container.bokeh_chart(stt_button, use_container_width=False)
-bokeh_container.markdown('<div id="bokeh_btn"></div>', unsafe_allow_html=True)
+    stt_button = Button(label=" Iniciar Reconocimiento de Voz ", width=1, height=1, 
+                       button_type="success")
     
     stt_button.js_on_event("button_click", CustomJS(code="""
         var recognition = new webkitSpeechRecognition();
