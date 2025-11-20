@@ -272,29 +272,36 @@ with tab1:
     st.markdown('<div class="info-text">Haz clic en el botón y di tu comando de voz</div>', unsafe_allow_html=True)
 
     # Botón de reconocimiento de voz - VISIBLE
-    st.write("Toca el Botón y habla ")
-
-    stt_button = Button(label=" Inicio ", width=200)
-    
+    stt_button = Button(label=" Iniciar Reconocimiento de Voz ", width=300, height=60, 
+                       button_type="success", css_classes=["pulse"])
     stt_button.js_on_event("button_click", CustomJS(code="""
         var recognition = new webkitSpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-     
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'es-ES';
+
+        recognition.onstart = function() {
+            document.dispatchEvent(new CustomEvent("RECORDING_START"));
+        }
+
         recognition.onresult = function (e) {
-            var value = "";
-            for (var i = e.resultIndex; i < e.results.length; ++i) {
-                if (e.results[i].isFinal) {
-                    value += e.results[i][0].transcript;
-                }
-            }
+            var value = e.results[0][0].transcript;
             if ( value != "") {
                 document.dispatchEvent(new CustomEvent("GET_TEXT", {detail: value}));
             }
         }
+
+        recognition.onerror = function(e) {
+            document.dispatchEvent(new CustomEvent("RECORDING_ERROR", {detail: e.error}));
+        }
+
+        recognition.onend = function() {
+            document.dispatchEvent(new CustomEvent("RECORDING_END"));
+        }
+
         recognition.start();
-        """))
-    
+    """))
+
     # Procesar eventos
     result = streamlit_bokeh_events(
         stt_button,
