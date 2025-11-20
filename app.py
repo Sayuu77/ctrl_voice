@@ -178,7 +178,6 @@ def on_publish(client, userdata, result):
     st.toast("Comando enviado exitosamente", icon="✅")
 
 def on_message(client, userdata, message):
-    global message_received
     time.sleep(2)
     message_received = str(message.payload.decode("utf-8"))
     st.session_state.last_received = message_received
@@ -252,15 +251,35 @@ def enviar_comando_mqtt(comando):
         ret = client.publish("appcolor", message)
         
         st.toast(f"📡 Comando enviado: {comando}", icon="✅")
+        st.session_state.last_command = comando
+        st.session_state.ultimo_comando_camara = comando
         time.sleep(0.5)
         client.disconnect()
-        
-        # Actualizar el último comando en session state
-        st.session_state.last_command = comando
         return True
     except Exception as e:
         st.error(f"❌ Error al enviar comando: {e}")
         return False
+
+# Callbacks para los botones de cámara
+def encender_amarillo():
+    enviar_comando_mqtt("enciende amarillo")
+    st.session_state.boton_presionado = "amarillo"
+
+def encender_rojo():
+    enviar_comando_mqtt("enciende rojo")
+    st.session_state.boton_presionado = "rojo"
+
+def encender_verde():
+    enviar_comando_mqtt("enciende verde")
+    st.session_state.boton_presionado = "verde"
+
+def encender_todos():
+    enviar_comando_mqtt("enciende todos los leds")
+    st.session_state.boton_presionado = "todos"
+
+def apagar_todos():
+    enviar_comando_mqtt("apaga todos los leds")
+    st.session_state.boton_presionado = "apagar_todos"
 
 # Inicializar session state
 if 'last_command' not in st.session_state:
@@ -271,6 +290,10 @@ if 'foto_tomada' not in st.session_state:
     st.session_state.foto_tomada = None
 if 'colores_detectados' not in st.session_state:
     st.session_state.colores_detectados = {}
+if 'boton_presionado' not in st.session_state:
+    st.session_state.boton_presionado = None
+if 'ultimo_comando_camara' not in st.session_state:
+    st.session_state.ultimo_comando_camara = ""
 
 # Header principal
 st.markdown('<div class="main-title">🎤 Control por Voz y Cámara</div>', unsafe_allow_html=True)
@@ -291,12 +314,6 @@ with st.expander("📋 Comandos Disponibles", expanded=True):
         
         <div class="command-item led-todos"><strong>🌈 Enciende todos los LEDs</strong> - Enciende todos los LEDs</div>
         <div class="command-item led-todos"><strong>🔌 Apaga todos los LEDs</strong> - Apaga todos los LEDs</div>
-        
-        <div class="command-item luz-principal"><strong>💡 Enciende la luz</strong> - Enciende luz principal</div>
-        <div class="command-item luz-principal"><strong>🔌 Apaga la luz</strong> - Apaga luz principal</div>
-        
-        <div class="command-item puerta"><strong>🚪 Abre la puerta</strong> - Abre la puerta</div>
-        <div class="command-item puerta"><strong>🚪 Cierra la puerta</strong> - Cierra la puerta</div>
         
         <div style="margin-top: 1rem; padding: 0.5rem; background: #E3F2FD; border-radius: 5px;">
             <small>📷 <strong>Detección por Cámara:</strong> Toma una foto y los LEDs se encienden automáticamente según los colores detectados</small>
@@ -333,85 +350,93 @@ if st.session_state.foto_tomada is not None:
     st.image(st.session_state.foto_tomada, use_column_width=True)
     
     # Botón para procesar la imagen
-    if st.button("🔍 Analizar Colores en la Imagen", use_container_width=True):
+    if st.button("🔍 Analizar Colores en la Imagen", use_container_width=True, key="analizar_colores"):
         with st.spinner("Analizando colores..."):
             # Detectar colores
             st.session_state.colores_detectados = detectar_colores(st.session_state.foto_tomada)
-            
-            # Mostrar resultados
-            st.markdown("### 🎨 Colores Detectados")
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.session_state.colores_detectados['amarillo']:
-                    st.markdown(f'<div class="color-indicator amarillo">🟡 AMARILLO ({st.session_state.colores_detectados["porcentajes"]["amarillo"]}%)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Amarillo", key="amarillo_on", use_container_width=True):
-                        # ENVIAR COMANDO CORRECTO PARA AMARILLO
-                        enviar_comando_mqtt("enciende amarillo")
-                        st.success("✅ Comando enviado: encender amarillo")
-                else:
-                    st.markdown('<div class="color-indicator">⚫ AMARILLO (No detectado)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Amarillo (Forzar)", key="amarillo_force", use_container_width=True):
-                        enviar_comando_mqtt("enciende amarillo")
-                        st.success("✅ Comando enviado: encender amarillo")
-            
-            with col2:
-                if st.session_state.colores_detectados['rojo']:
-                    st.markdown(f'<div class="color-indicator rojo">🔴 ROJO ({st.session_state.colores_detectados["porcentajes"]["rojo"]}%)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Rojo", key="rojo_on", use_container_width=True):
-                        # ENVIAR COMANDO CORRECTO PARA ROJO
-                        enviar_comando_mqtt("enciende rojo")
-                        st.success("✅ Comando enviado: encender rojo")
-                else:
-                    st.markdown('<div class="color-indicator">⚫ ROJO (No detectado)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Rojo (Forzar)", key="rojo_force", use_container_width=True):
-                        enviar_comando_mqtt("enciende rojo")
-                        st.success("✅ Comando enviado: encender rojo")
-            
-            with col3:
-                if st.session_state.colores_detectados['verde']:
-                    st.markdown(f'<div class="color-indicator verde">🟢 VERDE ({st.session_state.colores_detectados["porcentajes"]["verde"]}%)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Verde", key="verde_on", use_container_width=True):
-                        # ENVIAR COMANDO CORRECTO PARA VERDE
-                        enviar_comando_mqtt("enciende verde")
-                        st.success("✅ Comando enviado: encender verde")
-                else:
-                    st.markdown('<div class="color-indicator">⚫ VERDE (No detectado)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Verde (Forzar)", key="verde_force", use_container_width=True):
-                        enviar_comando_mqtt("enciende verde")
-                        st.success("✅ Comando enviado: encender verde")
-            
-            # Botón para encender todos los colores detectados
-            colores_presentes = [
-                color for color in ['amarillo', 'rojo', 'verde'] 
-                if st.session_state.colores_detectados[color]
-            ]
-            
+    
+    # Mostrar resultados si hay colores detectados
+    if st.session_state.colores_detectados:
+        st.markdown("### 🎨 Colores Detectados")
+        
+        # Mostrar porcentajes
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            porcentaje_amarillo = st.session_state.colores_detectados["porcentajes"]["amarillo"]
+            if st.session_state.colores_detectados['amarillo']:
+                st.markdown(f'<div class="color-indicator amarillo">🟡 AMARILLO ({porcentaje_amarillo}%)</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="color-indicator">⚫ AMARILLO ({porcentaje_amarillo}%)</div>', unsafe_allow_html=True)
+                
+        with col2:
+            porcentaje_rojo = st.session_state.colores_detectados["porcentajes"]["rojo"]
+            if st.session_state.colores_detectados['rojo']:
+                st.markdown(f'<div class="color-indicator rojo">🔴 ROJO ({porcentaje_rojo}%)</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="color-indicator">⚫ ROJO ({porcentaje_rojo}%)</div>', unsafe_allow_html=True)
+                
+        with col3:
+            porcentaje_verde = st.session_state.colores_detectados["porcentajes"]["verde"]
+            if st.session_state.colores_detectados['verde']:
+                st.markdown(f'<div class="color-indicator verde">🟢 VERDE ({porcentaje_verde}%)</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="color-indicator">⚫ VERDE ({porcentaje_verde}%)</div>', unsafe_allow_html=True)
+        
+        st.markdown("### 🎛️ Control de LEDs desde Cámara")
+        
+        # Botones de control individual
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("💡 ENCENDER AMARILLO", key="btn_amarillo", use_container_width=True, type="primary"):
+                encender_amarillo()
+                
+        with col2:
+            if st.button("🔴 ENCENDER ROJO", key="btn_rojo", use_container_width=True, type="primary"):
+                encender_rojo()
+                
+        with col3:
+            if st.button("🟢 ENCENDER VERDE", key="btn_verde", use_container_width=True, type="primary"):
+                encender_verde()
+        
+        # Botones de control múltiple
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Encender todos los colores detectados
+            colores_presentes = [color for color in ['amarillo', 'rojo', 'verde'] 
+                               if st.session_state.colores_detectados[color]]
             if colores_presentes:
-                st.markdown("---")
-                if st.button("🌈 ENCENDER TODOS LOS COLORES DETECTADOS", use_container_width=True, type="primary"):
+                if st.button("🌈 ENCENDER COLORES DETECTADOS", use_container_width=True):
                     for color in colores_presentes:
-                        comando = f"enciende {color}"
-                        enviar_comando_mqtt(comando)
-                        time.sleep(0.3)  # Pequeña pausa entre comandos
+                        if color == 'amarillo':
+                            encender_amarillo()
+                        elif color == 'rojo':
+                            encender_rojo()
+                        elif color == 'verde':
+                            encender_verde()
+                        time.sleep(0.5)
                     st.success(f"✅ Encendidos: {', '.join(colores_presentes).upper()}")
-            
-            # Botones de control general
-            st.markdown("---")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔌 APAGAR TODOS LOS LEDs", use_container_width=True, type="secondary"):
-                    enviar_comando_mqtt("apaga todos los leds")
-                    st.success("✅ Todos los LEDs apagados")
-            
-            with col2:
+            else:
                 if st.button("🌈 ENCENDER TODOS LOS LEDs", use_container_width=True):
-                    enviar_comando_mqtt("enciende todos los leds")
-                    st.success("✅ Todos los LEDs encendidos")
+                    encender_todos()
+        
+        with col2:
+            if st.button("🔌 APAGAR TODOS LOS LEDs", use_container_width=True, type="secondary"):
+                apagar_todos()
+
+# Mostrar estado del último comando de cámara
+if st.session_state.boton_presionado:
+    st.markdown(f"### 📝 Última Acción de Cámara")
+    st.markdown(f'<div class="result-box">'
+                f'<span style="font-size: 1.2rem; color: #4CAF50; font-weight: 600;">'
+                f'Comando enviado: {st.session_state.ultimo_comando_camara}'
+                f'</span></div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Sección de control por voz (código original corregido)
+# Sección de control por voz
 st.markdown("## 🎤 Control por Voz")
 
 # Icono de micrófono centrado
@@ -477,41 +502,31 @@ if result and "GET_TEXT" in result:
     
     # Normalizar el comando
     command = command.lower().strip(' .!?')
-    st.session_state.last_command = command
     
     # Mostrar comando reconocido
     st.markdown("### 🎯 Comando Reconocido")
     st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
     
-    # Mapeo de comandos CORREGIDO
+    # Mapeo de comandos
     command_mapping = {
-        # Comandos para LED amarillo
         'enciende el amarillo': 'enciende amarillo',
         'prende el amarillo': 'enciende amarillo', 
         'enciende amarillo': 'enciende amarillo',
         'apaga el amarillo': 'apaga amarillo',
         'apaga amarillo': 'apaga amarillo',
-        
-        # Comandos para LED rojo
         'enciende el rojo': 'enciende rojo',
         'prende el rojo': 'enciende rojo',
         'enciende rojo': 'enciende rojo', 
         'apaga el rojo': 'apaga rojo',
         'apaga rojo': 'apaga rojo',
-        
-        # Comandos para LED verde
         'enciende el verde': 'enciende verde',
         'prende el verde': 'enciende verde',
         'enciende verde': 'enciende verde',
         'apaga el verde': 'apaga verde',
         'apaga verde': 'apaga verde',
-        
-        # Comandos para todos los LEDs
         'enciende todos los leds': 'enciende todos los leds',
         'prende todos los leds': 'enciende todos los leds',
         'apaga todos los leds': 'apaga todos los leds',
-        
-        # Comandos simples
         'amarillo': 'enciende amarillo',
         'rojo': 'enciende rojo', 
         'verde': 'enciende verde',
