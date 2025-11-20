@@ -302,6 +302,8 @@ with tab1:
         recognition.start();
     """))
 
+    st.bokeh_chart(stt_button)
+    
     # Procesar eventos
     result = streamlit_bokeh_events(
         stt_button,
