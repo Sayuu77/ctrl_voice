@@ -317,39 +317,34 @@ with tab1:
     # Sección de grabación de voz con diseño mejorado
     st.markdown('<div class="voice-section">', unsafe_allow_html=True)
     
-    # Botón de micrófono rediseñado
-    st.markdown('<div class="mic-button-container">', unsafe_allow_html=True)
-    st.markdown('<div class="mic-button-wrapper">', unsafe_allow_html=True)
-    
-    # Elemento de pulso (solo se muestra visualmente)
-    if st.session_state.recording:
-        st.markdown('<div class="mic-pulse"></div>', unsafe_allow_html=True)
-    
-    # Botón principal de micrófono
+        # --- BOTÓN HTML PARA MICRÓFONO ---
     button_html = """
-    <div class="mic-button-main %s" onclick="this.dispatchEvent(new CustomEvent('button_click', {bubbles: true}))">
+    <script>
+        function triggerBokehEvent(){
+            document.querySelector("#bokeh_btn button").click();
+        }
+    </script>
+
+    <div class="mic-button-main %s" onclick="triggerBokehEvent()">
         🎤
     </div>
     """ % ("recording" if st.session_state.recording else "")
-    
+
     st.markdown(button_html, unsafe_allow_html=True)
-    
-    # Etiqueta del botón
+
     if st.session_state.recording:
         st.markdown('<div class="mic-label">🎙️ Grabando... Habla ahora</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="mic-label">Haz clic para hablar</div>', unsafe_allow_html=True)
-    
+
     st.markdown('</div>', unsafe_allow_html=True)  # Close wrapper
     st.markdown('</div>', unsafe_allow_html=True)  # Close container
-    
     st.markdown('<div class="info-text">Haz clic en el micrófono y di tu comando de voz</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)  # Close voice-section
 
-    # Botón de reconocimiento de voz (funcionalidad)
-    stt_button = Button(label=" Iniciar Reconocimiento de Voz ", width=1, height=1, 
-                       button_type="success")
-    
+    # --- BOTÓN INVISIBLE BOKEH ---
+    stt_button = Button(label="Iniciar Reconocimiento de Voz", width=1, height=1,
+                       button_type="success", css_classes=["hidden-button"])
     stt_button.js_on_event("button_click", CustomJS(code="""
         var recognition = new webkitSpeechRecognition();
         recognition.continuous = false;
@@ -378,7 +373,7 @@ with tab1:
         recognition.start();
     """))
 
-    # Procesar eventos
+    # Usamos streamlit_bokeh_events
     result = streamlit_bokeh_events(
         stt_button,
         events="GET_TEXT,RECORDING_START,RECORDING_END,RECORDING_ERROR",
@@ -388,7 +383,7 @@ with tab1:
         debounce_time=0
     )
 
-    # Mostrar estado de grabación
+    # --- Manejo de eventos de voz ---
     if result:
         if "RECORDING_START" in result:
             st.session_state.recording = True
@@ -401,18 +396,11 @@ with tab1:
             st.error("❌ Error en el reconocimiento de voz")
             st.rerun()
 
-    # Mostrar resultados del comando
     if result and "GET_TEXT" in result:
-        command = result.get("GET_TEXT").strip()
-        
-        # Normalizar el comando
-        command = command.lower().strip(' .!?')
+        command = result.get("GET_TEXT").strip().lower()
         st.session_state.last_command = command
-        
-        # Mostrar comando reconocido
         st.markdown("### 🎯 Comando Reconocido")
-        st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
-        
+        st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)    
         # Mapeo de comandos más flexible con control de encendido/apagado
         command_mapping = {
             # Comandos para ENCENDER LED Amarillo
