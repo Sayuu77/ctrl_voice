@@ -35,13 +35,11 @@ st.image(image, width=200)
 
 st.write("Toca el Botón y habla ")
 
-# Instrucciones para el usuario
+# Instrucciones para el usuario con los comandos específicos
 st.markdown("""
 ### Comandos de voz disponibles:
-- **Para LEDs**: "enciende el led amarillo", "apaga el led rojo", "enciende todos los leds"
-- **Para luces**: "enciende la luz", "apaga la luz principal"  
-- **Para puerta**: "abre la puerta", "cierra la puerta"
-- **Comandos simples**: "amarillo", "rojo", "verde"
+- **Encender individual**: "enciende el verde", "enciende el rojo", "enciende el amarillo"
+- **Control general**: "enciende todos", "apaga todos"
 """)
 
 stt_button = Button(label=" Inicio ", width=200)
@@ -50,7 +48,7 @@ stt_button.js_on_event("button_click", CustomJS(code="""
     var recognition = new webkitSpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'es-ES';  // Configurar para español
+    recognition.lang = 'es-ES';
 
     recognition.onresult = function (e) {
         var value = "";
@@ -84,19 +82,23 @@ if result:
         comando = result.get("GET_TEXT").strip()
         st.write("**Comando detectado:**", comando)
         
+        # Convertir TODO a minúsculas para consistencia
+        comando_normalizado = comando.lower()
+        st.write("**Comando normalizado:**", comando_normalizado)
+        
         # Conectar y publicar el comando
         try:
             client1.on_publish = on_publish
             client1.connect(broker, port)
             
-            # Crear mensaje JSON
-            message = json.dumps({"Act1": comando})
+            # Crear mensaje JSON con el comando en minúsculas
+            message = json.dumps({"Act1": comando_normalizado})
             
             # Publicar en el topic correcto
             ret = client1.publish("voice_ctrl", message)
             
             if ret[0] == 0:
-                st.success(f"✅ Comando enviado: '{comando}'")
+                st.success(f"✅ Comando enviado: '{comando_normalizado}'")
             else:
                 st.error("❌ Error al enviar el comando")
                 
@@ -106,8 +108,6 @@ if result:
 # Sección para mostrar estado
 st.markdown("---")
 st.subheader("Estado del Sistema")
-
-# Placeholder para el estado actual (podrías implementar suscripción MQTT para actualizaciones en tiempo real)
 st.info("Los comandos se envían al Arduino via MQTT. El estado se actualizará cuando el Arduino procese el comando.")
 
 try:
