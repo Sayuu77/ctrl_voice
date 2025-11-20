@@ -276,8 +276,8 @@ with tab1:
                        button_type="success", css_classes=["pulse"])
     stt_button.js_on_event("button_click", CustomJS(code="""
         var recognition = new webkitSpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
+        recognition.continuous = true;
+        recognition.interimResults = true;
         recognition.lang = 'es-ES';
 
         recognition.onstart = function() {
