@@ -7,3 +7,4 @@ gtts
 googletrans
 opencv-python-headless
 openai
+pyaudio
