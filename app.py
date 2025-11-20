@@ -16,12 +16,12 @@ import io
 
 # Configuración de página
 st.set_page_config(
-    page_title="Sistema IoT Inteligente",
-    page_icon="🎮",
+    page_title="Control por Voz",
+    page_icon="🎤",
     layout="centered"
 )
 
-# Estilos CSS modernos combinados
+# Estilos CSS modernos
 st.markdown("""
 <style>
     .main-title {
@@ -255,7 +255,7 @@ st.markdown('<div class="subtitle">Control por voz y detección de colores</div>
 tab1, tab2 = st.tabs(["🎤 Control por Voz", "🎯 Detector de Colores"])
 
 with tab1:
-    # CONTENIDO DEL PRIMER CÓDIGO (CONTROL POR VOZ)
+    # CONTENIDO EXACTO DEL PRIMER CÓDIGO - SIN MODIFICACIONES
     st.markdown("### 🎤 Control por Voz")
     
     # Sección de comandos disponibles
@@ -491,8 +491,17 @@ with tab1:
         except:
             st.error("❌ No se puede conectar al broker MQTT")
 
+    # Footer
+    st.markdown("---")
+    st.markdown(
+        "<div style='text-align: center; color: #666;'>"
+        "Control por Voz IoT | Streamlit + ESP32 + MQTT"
+        "</div>", 
+        unsafe_allow_html=True
+    )
+
 with tab2:
-    # CONTENIDO DEL SEGUNDO CÓDIGO (DETECTOR DE COLORES)
+    # CONTENIDO DEL SEGUNDO CÓDIGO MODIFICADO (solo detecta amarillo, verde, rojo y enciende LEDs)
     st.markdown("### 🎯 Detector de Colores: Amarillo, Verde, Rojo")
     
     with st.sidebar:
@@ -789,12 +798,3 @@ with tab2:
         - El análisis es específico para **amarillo, verde y rojo**
         - Los LEDs se encienden automáticamente según los colores detectados
         """)
-
-# Footer
-st.markdown("---")
-st.markdown(
-    "<div style='text-align: center; color: #666;'>"
-    "Sistema IoT Inteligente | Control por Voz + Detección de Colores"
-    "</div>", 
-    unsafe_allow_html=True
-)
