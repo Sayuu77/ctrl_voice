@@ -136,6 +136,23 @@ st.markdown("""
     .color-yellow { background: #FFF9C4; color: #F57F17; border: 2px solid #FFEB3B; }
     .color-red { background: #FFEBEE; color: #C62828; border: 2px solid #F44336; }
     .color-green { background: #E8F5E8; color: #2E7D32; border: 2px solid #4CAF50; }
+    .stButton>button {
+        background: linear-gradient(135deg, #7E57C2, #BA68C8);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.75rem 2rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(126, 87, 194, 0.3);
+        width: 100%;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(126, 87, 194, 0.4);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -331,8 +348,9 @@ if foto is not None:
                 except Exception as e:
                     st.error(f"❌ Error al enviar comandos: {e}")
 
-# El resto del código original permanece igual...
-# [Aquí va todo el resto de tu código original de control por voz]
+# SECCIÓN DE CONTROL POR VOZ (ORIGINAL)
+st.markdown("---")
+st.markdown("### 🎤 Control por Voz")
 
 # Icono de micrófono centrado
 col1, col2, col3 = st.columns([1, 2, 1])
