@@ -16,3 +16,10 @@ xyzservices >=2021.09.1
 bokeh==2.4.3
 Streamlit-bokeh-events
 opencv-python
+bokeh
+streamlit-bokeh-events
+Pillow
+paho-mqtt
+gtts
+googletrans
+opencv-python-headless
