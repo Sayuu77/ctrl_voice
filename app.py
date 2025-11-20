@@ -52,7 +52,7 @@ st.markdown("""
     }
     .mic-button {
         background: linear-gradient(135deg, #7E57C2, #BA68C8);
-        color: green;
+        color: white;
         border: none;
         border-radius: 50%;
         width: 120px;
@@ -267,6 +267,7 @@ with tab1:
     # Icono de micrófono centrado
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
+        st.markdown('<div class="mic-button pulse">🎤</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="info-text">Haz clic en el botón y di tu comando de voz</div>', unsafe_allow_html=True)
 
@@ -419,6 +420,8 @@ with tab1:
             }
             
             mensaje, clase_css = color_indicators.get(normalized_command, (f'⚡ {normalized_command}', 'status-indicator'))
+            
+            st.markdown(f'<div class="{clase_css}">{mensaje}</div>', unsafe_allow_html=True)
             
             # Enviar comando por MQTT
             try:
