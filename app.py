@@ -241,20 +241,22 @@ def detectar_colores(imagen):
     
     return colores_detectados
 
-def enviar_comando_color(color, accion):
-    """Envía comando MQTT para controlar LEDs según color detectado"""
+def enviar_comando_mqtt(comando):
+    """Envía comando MQTT de manera genérica"""
     try:
-        client = paho.Client("streamlit-camera-control")
+        client = paho.Client("streamlit-control")
         client.on_publish = on_publish
         client.connect(broker, port)
         
-        comando = f"{accion} {color}"
         message = json.dumps({"Act1": comando})
         ret = client.publish("appcolor", message)
         
-        st.toast(f"💡 {accion.capitalize()} LED {color.upper()}", icon="✅")
-        time.sleep(1)
+        st.toast(f"📡 Comando enviado: {comando}", icon="✅")
+        time.sleep(0.5)
         client.disconnect()
+        
+        # Actualizar el último comando en session state
+        st.session_state.last_command = comando
         return True
     except Exception as e:
         st.error(f"❌ Error al enviar comando: {e}")
@@ -343,26 +345,41 @@ if st.session_state.foto_tomada is not None:
             with col1:
                 if st.session_state.colores_detectados['amarillo']:
                     st.markdown(f'<div class="color-indicator amarillo">🟡 AMARILLO ({st.session_state.colores_detectados["porcentajes"]["amarillo"]}%)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Amarillo", key="amarillo_on"):
-                        enviar_comando_color("amarillo", "enciende")
+                    if st.button("💡 Encender Amarillo", key="amarillo_on", use_container_width=True):
+                        # ENVIAR COMANDO CORRECTO PARA AMARILLO
+                        enviar_comando_mqtt("enciende amarillo")
+                        st.success("✅ Comando enviado: encender amarillo")
                 else:
                     st.markdown('<div class="color-indicator">⚫ AMARILLO (No detectado)</div>', unsafe_allow_html=True)
+                    if st.button("💡 Encender Amarillo (Forzar)", key="amarillo_force", use_container_width=True):
+                        enviar_comando_mqtt("enciende amarillo")
+                        st.success("✅ Comando enviado: encender amarillo")
             
             with col2:
                 if st.session_state.colores_detectados['rojo']:
                     st.markdown(f'<div class="color-indicator rojo">🔴 ROJO ({st.session_state.colores_detectados["porcentajes"]["rojo"]}%)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Rojo", key="rojo_on"):
-                        enviar_comando_color("rojo", "enciende")
+                    if st.button("💡 Encender Rojo", key="rojo_on", use_container_width=True):
+                        # ENVIAR COMANDO CORRECTO PARA ROJO
+                        enviar_comando_mqtt("enciende rojo")
+                        st.success("✅ Comando enviado: encender rojo")
                 else:
                     st.markdown('<div class="color-indicator">⚫ ROJO (No detectado)</div>', unsafe_allow_html=True)
+                    if st.button("💡 Encender Rojo (Forzar)", key="rojo_force", use_container_width=True):
+                        enviar_comando_mqtt("enciende rojo")
+                        st.success("✅ Comando enviado: encender rojo")
             
             with col3:
                 if st.session_state.colores_detectados['verde']:
                     st.markdown(f'<div class="color-indicator verde">🟢 VERDE ({st.session_state.colores_detectados["porcentajes"]["verde"]}%)</div>', unsafe_allow_html=True)
-                    if st.button("💡 Encender Verde", key="verde_on"):
-                        enviar_comando_color("verde", "enciende")
+                    if st.button("💡 Encender Verde", key="verde_on", use_container_width=True):
+                        # ENVIAR COMANDO CORRECTO PARA VERDE
+                        enviar_comando_mqtt("enciende verde")
+                        st.success("✅ Comando enviado: encender verde")
                 else:
                     st.markdown('<div class="color-indicator">⚫ VERDE (No detectado)</div>', unsafe_allow_html=True)
+                    if st.button("💡 Encender Verde (Forzar)", key="verde_force", use_container_width=True):
+                        enviar_comando_mqtt("enciende verde")
+                        st.success("✅ Comando enviado: encender verde")
             
             # Botón para encender todos los colores detectados
             colores_presentes = [
@@ -371,20 +388,30 @@ if st.session_state.foto_tomada is not None:
             ]
             
             if colores_presentes:
-                if st.button("🌈 Encender Todos los Colores Detectados", use_container_width=True):
+                st.markdown("---")
+                if st.button("🌈 ENCENDER TODOS LOS COLORES DETECTADOS", use_container_width=True, type="primary"):
                     for color in colores_presentes:
-                        enviar_comando_color(color, "enciende")
-                        time.sleep(0.5)
+                        comando = f"enciende {color}"
+                        enviar_comando_mqtt(comando)
+                        time.sleep(0.3)  # Pequeña pausa entre comandos
                     st.success(f"✅ Encendidos: {', '.join(colores_presentes).upper()}")
             
-            # Botón para apagar todos los LEDs
-            if st.button("🔌 Apagar Todos los LEDs", use_container_width=True):
-                enviar_comando_color("todos", "apaga")
-                st.success("🔌 Todos los LEDs apagados")
+            # Botones de control general
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔌 APAGAR TODOS LOS LEDs", use_container_width=True, type="secondary"):
+                    enviar_comando_mqtt("apaga todos los leds")
+                    st.success("✅ Todos los LEDs apagados")
+            
+            with col2:
+                if st.button("🌈 ENCENDER TODOS LOS LEDs", use_container_width=True):
+                    enviar_comando_mqtt("enciende todos los leds")
+                    st.success("✅ Todos los LEDs encendidos")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Sección de control por voz (tu código original)
+# Sección de control por voz (código original corregido)
 st.markdown("## 🎤 Control por Voz")
 
 # Icono de micrófono centrado
@@ -456,49 +483,45 @@ if result and "GET_TEXT" in result:
     st.markdown("### 🎯 Comando Reconocido")
     st.markdown(f'<div class="result-box"><span style="font-size: 1.4rem; color: #7E57C2; font-weight: 600;">"{command}"</span></div>', unsafe_allow_html=True)
     
-    # Mapeo de comandos (tu código original)
+    # Mapeo de comandos CORREGIDO
     command_mapping = {
+        # Comandos para LED amarillo
         'enciende el amarillo': 'enciende amarillo',
-        'prende el amarillo': 'enciende amarillo',
+        'prende el amarillo': 'enciende amarillo', 
         'enciende amarillo': 'enciende amarillo',
         'apaga el amarillo': 'apaga amarillo',
         'apaga amarillo': 'apaga amarillo',
+        
+        # Comandos para LED rojo
         'enciende el rojo': 'enciende rojo',
         'prende el rojo': 'enciende rojo',
-        'enciende rojo': 'enciende rojo',
+        'enciende rojo': 'enciende rojo', 
         'apaga el rojo': 'apaga rojo',
         'apaga rojo': 'apaga rojo',
+        
+        # Comandos para LED verde
         'enciende el verde': 'enciende verde',
         'prende el verde': 'enciende verde',
         'enciende verde': 'enciende verde',
         'apaga el verde': 'apaga verde',
         'apaga verde': 'apaga verde',
+        
+        # Comandos para todos los LEDs
         'enciende todos los leds': 'enciende todos los leds',
+        'prende todos los leds': 'enciende todos los leds',
         'apaga todos los leds': 'apaga todos los leds',
-        'enciende la luz': 'enciende luz',
-        'apaga la luz': 'apaga luz',
-        'abre la puerta': 'abre puerta',
-        'cierra la puerta': 'cierra puerta',
+        
+        # Comandos simples
         'amarillo': 'enciende amarillo',
-        'rojo': 'enciende rojo',
+        'rojo': 'enciende rojo', 
         'verde': 'enciende verde',
     }
     
+    # Obtener comando normalizado
     normalized_command = command_mapping.get(command, command)
     
     # Enviar comando por MQTT
-    try:
-        client1 = paho.Client("streamlit-voice-control")
-        client1.on_publish = on_publish
-        client1.connect(broker, port)
-        message = json.dumps({"Act1": normalized_command})
-        ret = client1.publish("appcolor", message)
-        
-        st.toast(f"📡 Comando enviado: {normalized_command}", icon="✅")
-        time.sleep(1)
-        client1.disconnect()
-    except Exception as e:
-        st.error(f"❌ Error al enviar comando: {e}")
+    enviar_comando_mqtt(normalized_command)
 
 # Historial e información
 if st.session_state.last_command:
