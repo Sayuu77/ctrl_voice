@@ -52,7 +52,7 @@ st.markdown("""
     }
     .mic-button {
         background: linear-gradient(135deg, #7E57C2, #BA68C8);
-        color: white;
+        color: green;
         border: none;
         border-radius: 50%;
         width: 120px;
