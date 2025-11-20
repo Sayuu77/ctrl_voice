@@ -456,8 +456,7 @@ if result:
                     
                 time.sleep(1)  # Dar tiempo para que se envíe el mensaje
                 client1.disconnect()
-            except Exception as e:
-                st.error(f"❌ Error al enviar comando: {e}")
+            except Exception as e: st.error(f"❌ Error al enviar comando: {e}")
 
     # Historial de comandos
     if st.session_state.last_command:
