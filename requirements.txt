@@ -7,11 +7,3 @@ gtts
 googletrans
 opencv-python-headless
 openai
-pyaudio
-streamlit==1.28.0
-pyaudio==0.2.11
-SpeechRecognition==3.10.0
-opencv-python==4.8.1.78
-Pillow==10.0.1
-paho-mqtt==1.6.1
-numpy==1.24.3
